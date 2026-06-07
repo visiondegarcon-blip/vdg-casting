@@ -1,0 +1,1678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VDG — Casting Panel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ============================================================
+   TOKENS & RESET
+============================================================ */
+:root {
+  --black:    #0a0a0a;
+  --off:      #111111;
+  --surface:  #161616;
+  --border:   #242424;
+  --muted:    #3a3a3a;
+  --text-dim: #888;
+  --text:     #e8e8e8;
+  --white:    #f5f5f5;
+  --accent:   #c8ff00;        /* VDG lime */
+  --accent2:  #ff4d00;        /* fire orange */
+  --blue:     #4da6ff;
+  --radius:   6px;
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'Space Mono', monospace;
+  --sidebar: 260px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; }
+body {
+  background: var(--black);
+  color: var(--text);
+  font-family: var(--font-body);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: var(--font-body); }
+input, select, textarea {
+  font-family: var(--font-body);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  width: 100%;
+  font-size: 14px;
+  transition: border-color .2s;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+select option { background: var(--surface); }
+label { font-size: 12px; color: var(--text-dim); letter-spacing: .05em; text-transform: uppercase; font-weight: 500; display: block; margin-bottom: 6px; }
+.hidden { display: none !important; }
+
+/* ============================================================
+   AUTH SCREEN
+============================================================ */
+#auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--black);
+  position: relative;
+  overflow: hidden;
+}
+#auth-screen::before {
+  content: 'VDG';
+  position: absolute;
+  font-family: var(--font-display);
+  font-size: clamp(120px, 25vw, 300px);
+  color: transparent;
+  -webkit-text-stroke: 1px var(--border);
+  letter-spacing: .05em;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 48px 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  position: relative;
+  z-index: 2;
+}
+.auth-logo {
+  font-family: var(--font-display);
+  font-size: 36px;
+  letter-spacing: .15em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+.auth-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  margin-bottom: 40px;
+  font-family: var(--font-mono);
+}
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.auth-tab {
+  flex: 1;
+  padding: 10px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: .05em;
+  transition: all .2s;
+}
+.auth-tab.active { background: var(--accent); color: var(--black); font-weight: 700; }
+.form-group { margin-bottom: 18px; }
+.btn {
+  width: 100%;
+  padding: 13px;
+  background: var(--accent);
+  color: var(--black);
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  transition: opacity .2s, transform .1s;
+  margin-top: 8px;
+}
+.btn:hover { opacity: .88; }
+.btn:active { transform: scale(.98); }
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: none; opacity:1; }
+.btn-sm {
+  width: auto;
+  padding: 7px 14px;
+  font-size: 12px;
+}
+.btn-danger { background: var(--accent2); }
+.auth-msg { font-size: 13px; color: var(--text-dim); text-align: center; margin-top: 16px; }
+.auth-msg span { color: var(--accent); cursor: pointer; }
+.error-msg { color: var(--accent2); font-size: 13px; margin-top: 10px; min-height: 20px; }
+.role-note { font-size: 11px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+
+/* ============================================================
+   APP SHELL
+============================================================ */
+#app { display: flex; min-height: 100vh; }
+
+/* Sidebar */
+.sidebar {
+  width: var(--sidebar);
+  background: var(--off);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  z-index: 100;
+  transition: transform .3s;
+}
+.sidebar-logo {
+  padding: 28px 24px 20px;
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: .15em;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-event {
+  padding: 12px 24px;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-nav { flex: 1; padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all .15s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.nav-item:hover { background: var(--surface); color: var(--text); }
+.nav-item.active { background: var(--surface); color: var(--accent); }
+.nav-icon { font-size: 16px; width: 20px; text-align: center; }
+.sidebar-user {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { font-size: 11px; color: var(--text-dim); font-family: var(--font-mono); }
+.signout-btn {
+  background: none;
+  border: 1px solid var(--muted);
+  color: var(--text-dim);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 11px;
+  transition: all .2s;
+}
+.signout-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+/* Main content */
+.main {
+  margin-left: var(--sidebar);
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.topbar {
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--black);
+  z-index: 50;
+}
+.topbar-title { font-family: var(--font-display); font-size: 26px; letter-spacing: .08em; }
+.topbar-actions { display: flex; align-items: center; gap: 12px; }
+.content { padding: 32px; flex: 1; }
+
+/* ============================================================
+   STATS ROW
+============================================================ */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+.stat-num { font-family: var(--font-display); font-size: 40px; color: var(--accent); line-height: 1; }
+.stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
+
+/* ============================================================
+   FILTERS
+============================================================ */
+.filter-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-bar input, .filter-bar select { width: auto; min-width: 180px; flex: 1; }
+.filter-chip {
+  padding: 8px 14px;
+  border-radius: 40px;
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.filter-chip.active { background: var(--accent); border-color: var(--accent); color: var(--black); }
+
+/* ============================================================
+   MODEL GRID
+============================================================ */
+.model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+.model-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color .2s, transform .2s;
+  cursor: pointer;
+}
+.model-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.model-card.approved { border-color: var(--accent); }
+.card-header {
+  padding: 18px 20px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.card-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.card-name-block { flex: 1; min-width: 0; }
+.card-name { font-weight: 700; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-handle { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
+.card-status { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 40px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.badge-approved { background: rgba(200,255,0,.15); color: var(--accent); }
+.badge-pending { background: rgba(255,255,255,.06); color: var(--text-dim); }
+.badge-gender-male { background: rgba(77,166,255,.12); color: var(--blue); }
+.badge-gender-female { background: rgba(255,150,200,.12); color: #ff96c8; }
+.badge-ethnicity { background: rgba(255,77,0,.1); color: #ff9060; }
+.badge-agency { background: rgba(255,220,0,.1); color: #ffd000; }
+.card-body { padding: 0 20px 16px; }
+.card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.tag {
+  padding: 3px 9px;
+  background: var(--muted);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.tag-custom {
+  background: rgba(200,255,0,.1);
+  color: var(--accent);
+  border: 1px solid rgba(200,255,0,.2);
+}
+.card-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.card-detail-row span:last-child { color: var(--text); text-align: right; }
+.card-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.stylist-assign {
+  flex: 1;
+  min-width: 120px;
+  font-size: 12px;
+  padding: 7px 10px;
+}
+.approve-btn {
+  padding: 7px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--accent);
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.approve-btn:hover { background: var(--accent); color: var(--black); }
+.approve-btn.approved-state { background: var(--accent); color: var(--black); }
+.talent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(77,166,255,.1);
+  border: 1px solid rgba(77,166,255,.2);
+  color: var(--blue);
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* ============================================================
+   MODEL DETAIL MODAL
+============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.8);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  animation: fadeIn .2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 720px;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp .25s ease;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-header {
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+}
+.modal-close {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .2s;
+  flex-shrink: 0;
+}
+.modal-close:hover { border-color: var(--accent2); color: var(--accent2); }
+.modal-body { padding: 28px; }
+.modal-section { margin-bottom: 28px; }
+.modal-section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.detail-item { }
+.detail-item label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+.detail-item .val { font-size: 14px; color: var(--text); }
+.photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.photo-thumb {
+  aspect-ratio: 3/4;
+  background: var(--muted);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.photo-upload-area {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.photo-upload-area:hover { border-color: var(--accent); }
+.photo-upload-area input { display: none; }
+.notes-area textarea { min-height: 80px; resize: vertical; }
+.tag-input-row { display: flex; gap: 8px; }
+.tag-input-row input { flex: 1; }
+.tags-display { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tag-remove {
+  background: var(--accent);
+  color: var(--black);
+  border: none;
+  border-radius: 40px;
+  padding: 3px 10px 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.tag-remove span.x { font-size: 13px; cursor: pointer; color: rgba(0,0,0,.5); }
+
+/* ============================================================
+   INVENTORY PAGE
+============================================================ */
+.inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+.inv-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.inv-card-name { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
+.inv-card-meta { font-size: 12px; color: var(--text-dim); margin-bottom: 12px; }
+.inv-assigned { font-size: 12px; color: var(--accent); font-family: var(--font-mono); }
+.add-inv-btn {
+  width: 100%;
+  padding: 40px 20px;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-family: var(--font-body);
+  transition: all .2s;
+  cursor: pointer;
+}
+.add-inv-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ============================================================
+   MODEL SELF-VIEW
+============================================================ */
+.model-profile-card {
+  max-width: 640px;
+  margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.model-profile-header {
+  background: var(--off);
+  padding: 32px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 32px;
+  color: var(--accent);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-name { font-family: var(--font-display); font-size: 28px; letter-spacing: .08em; }
+.profile-handle { font-size: 13px; color: var(--text-dim); font-family: var(--font-mono); }
+.profile-status-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.model-profile-body { padding: 28px 32px; }
+
+/* ============================================================
+   ROSTER PAGE (models viewing other models — limited)
+============================================================ */
+.roster-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.roster-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.roster-info { flex: 1; min-width: 0; }
+.roster-name { font-weight: 600; font-size: 14px; }
+.roster-handle { font-size: 12px; color: var(--text-dim); font-family: var(--font-mono); }
+.roster-list { display: flex; flex-direction: column; gap: 10px; }
+
+/* ============================================================
+   NOTIFICATIONS / TOAST
+============================================================ */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 999;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all .3s;
+  max-width: 300px;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.error { border-color: var(--accent2); }
+
+/* ============================================================
+   MOBILE MENU
+============================================================ */
+.mob-topbar {
+  display: none;
+  padding: 14px 20px;
+  background: var(--off);
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 150;
+}
+.mob-logo { font-family: var(--font-display); font-size: 24px; color: var(--accent); letter-spacing: .15em; }
+.hamburger { background: none; border: none; color: var(--text); font-size: 22px; }
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 99;
+}
+
+/* ============================================================
+   RESPONSIVE
+============================================================ */
+@media (max-width: 768px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-overlay.open { display: block; }
+  .main { margin-left: 0; }
+  .mob-topbar { display: flex; }
+  .topbar { display: none; }
+  .content { padding: 20px 16px; }
+  .model-grid { grid-template-columns: 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+  .filter-bar input, .filter-bar select { min-width: 0; width: 100%; }
+}
+
+/* loading */
+.loader {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 12px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     TOAST
+============================================================ -->
+<div id="toast"></div>
+
+<!-- ============================================================
+     AUTH SCREEN
+============================================================ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">VDG</div>
+    <div class="auth-sub">Casting Panel — Brisbane 05.07.26</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="showAuthTab('signin')">Sign In</button>
+      <button class="auth-tab" onclick="showAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Sign In -->
+    <div id="tab-signin">
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="si-email" placeholder="your@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="si-pass" placeholder="••••••••"/>
+      </div>
+      <button class="btn" onclick="signIn()">Sign In</button>
+      <div class="error-msg" id="si-error"></div>
+    </div>
+
+    <!-- Sign Up -->
+    <div id="tab-signup" class="hidden">
+      <div class="form-group">
+        <label>I am a...</label>
+        <select id="su-role" onchange="onRoleChange()">
+          <option value="">Select role</option>
+          <option value="model">Model / Applicant</option>
+          <option value="staff">Staff (Stylist / Hair / MUA)</option>
+        </select>
+      </div>
+
+      <!-- Model: pick name from dropdown -->
+      <div class="form-group hidden" id="model-name-group">
+        <label>Select Your Name</label>
+        <select id="su-model-name">
+          <option value="">— choose your name —</option>
+        </select>
+        <p class="role-note">Your application data will be pre-loaded. You'll be able to upload photos after signing up.</p>
+      </div>
+
+      <!-- Staff: pick name -->
+      <div class="form-group hidden" id="staff-name-group">
+        <label>Your Name</label>
+        <select id="su-staff-name">
+          <option value="">— choose your name —</option>
+          <option value="Christie">Christie — Hair Stylist</option>
+          <option value="Maria">Maria — Hair Stylist</option>
+          <option value="Neza">Neza — Hair Stylist</option>
+          <option value="Rebecca">Rebecca — Makeup Artist</option>
+          <option value="Daniel">Daniel — Stylist</option>
+          <option value="Dee">Dee — Stylist</option>
+          <option value="Komi">Komi — Stylist</option>
+        </select>
+        <p class="role-note">Staff accounts are shared — once created anyone on the team can log in.</p>
+      </div>
+
+      <div class="form-group hidden" id="su-email-group">
+        <label>Email</label>
+        <input type="email" id="su-email" placeholder="your@email.com"/>
+      </div>
+      <div class="form-group hidden" id="su-pass-group">
+        <label>Password</label>
+        <input type="password" id="su-pass" placeholder="At least 6 characters"/>
+      </div>
+      <button class="btn hidden" id="su-btn" onclick="signUp()">Create Account</button>
+      <div class="error-msg" id="su-error"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MAIN APP
+============================================================ -->
+<div id="app" class="hidden">
+
+  <!-- Mobile topbar -->
+  <div class="mob-topbar">
+    <div class="mob-logo">VDG</div>
+    <button class="hamburger" onclick="toggleSidebar()">☰</button>
+  </div>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">VDG</div>
+    <div class="sidebar-event" id="sidebar-event-label">Brisbane Runway — Jul 5</div>
+    <nav class="sidebar-nav" id="sidebar-nav">
+      <!-- injected by JS based on role -->
+    </nav>
+    <div class="sidebar-user">
+      <div class="user-info">
+        <div class="user-name" id="sidebar-username">—</div>
+        <div class="user-role" id="sidebar-userrole">—</div>
+      </div>
+      <button class="signout-btn" onclick="signOut()">Out</button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Desktop topbar -->
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </div>
+
+    <div class="content" id="page-content">
+      <div class="loading-screen"><div class="loader"></div> Loading...</div>
+    </div>
+  </main>
+</div>
+
+<!-- ============================================================
+     MODEL DETAIL MODAL
+============================================================ -->
+<div class="modal-overlay hidden" id="model-modal" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modal-inner">
+    <div class="modal-header">
+      <div>
+        <div style="font-family:var(--font-display);font-size:22px;letter-spacing:.05em" id="modal-name"></div>
+        <div style="font-size:12px;color:var(--text-dim);font-family:var(--font-mono)" id="modal-handle"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG — Replace with your Supabase project details
+// ============================================================
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+// MODEL DATA from Google Form
+// ============================================================
+const MODEL_ROSTER = [
+  { name: "Emmanuel Siboniyo", handle: "emmanuelsiboniyo_", gender: "Male", ethnicity: "African", followers: "500-1.5k", phone: "0422495681", age: 20, agency: "no", top: "S", jeans: "32", style: "casual, street, sophisticated", hair_ok: true, free_5july: true, height: "5'7-5'9", suburb: "Acacia Ridge", makeup_self: true, talent: false, talent_desc: "", cultural_piece: false, cultural_desc: "", portfolio: "" },
+  { name: "Bright Merha", handle: "_brxghtmxrha", gender: "Male", ethnicity: "African", followers: "500-1.5k", phone: "0416673543", age: 19, agency: "no", top: "M", jeans: "32", style: "Diverse", hair_ok: true, free_5july: true, height: "5'11-6ft", suburb: "Redbank Plains", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Can get a cultural piece before the show", portfolio: "" },
+  { name: "Mustafa Pathan", handle: "hellomustafaaa", gender: "Male", ethnicity: "Middle Eastern", followers: "1.5-3.5k", phone: "0490166066", age: 25, agency: "no", top: "L", jeans: "33", style: "dope as hell. casual, smart, comfy", hair_ok: false, free_5july: true, height: "5'11-6ft", suburb: "Rochedale", makeup_self: false, talent: true, talent_desc: "Can sing a couple of his songs", cultural_piece: true, cultural_desc: "Kuffiyah", portfolio: "" },
+  { name: "Jordan Sullivan", handle: "Souuljay", gender: "Male", ethnicity: "African", followers: "1.5-3.5k", phone: "0413792002", age: 22, agency: "no", top: "S", jeans: "32", style: "Minimalistic with a twist", hair_ok: true, free_5july: true, height: "6'1", suburb: "Mansfield", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Fulani jubba/thobe", portfolio: "https://drive.google.com/u/2/open?usp=forms_web&id=1G6IPVtnRB4Wpqb-A_fQKFZoI4rSetma6" },
+  { name: "Denzel Noah Hakim Diallo", handle: "d3z89k", gender: "Male", ethnicity: "African", followers: "0-500", phone: "0407651406", age: 15, agency: "no", top: "S", jeans: "32", style: "", hair_ok: true, free_5july: true, height: "5'11-6ft", suburb: "Mansfield", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Fulani clothes and accessories / Dutch", portfolio: "" },
+  { name: "Nathan Pool", handle: "nathanpool_", gender: "Male", ethnicity: "African", followers: "0-500", phone: "0474576921", age: 20, agency: "no", top: "M", jeans: "30", style: "Designer", hair_ok: true, free_5july: true, height: "6'2", suburb: "Greenbank", makeup_self: false, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Seychelles flag or symbol", portfolio: "" },
+  { name: "Aidenn Herrera", handle: "Axdennhxrrera", gender: "Male", ethnicity: "South Asian", followers: "500-1.5k", phone: "0450105316", age: 23, agency: "no", top: "S", jeans: "32", style: "Streetwear/high fashion", hair_ok: true, free_5july: false, height: "5'6 and below", suburb: "Yarrabilba", makeup_self: false, talent: true, talent_desc: "Dance & poetry", cultural_piece: true, cultural_desc: "Filo flag", portfolio: "" },
+  { name: "Maggie Benzley", handle: "mbenzley", gender: "Female", ethnicity: "Other", followers: "0-500", phone: "0473589060", age: 23, agency: "no", top: "S", jeans: "6-8", style: "Artistic street mix with classy", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Melbourne", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Waist necklace for Middle Eastern / Swiss side", portfolio: "" },
+  { name: "Tyrese Janson", handle: "tyrese.jpeg", gender: "Male", ethnicity: "South Asian", followers: "500-1.5k", phone: "0492085133", age: 17, agency: "no", top: "S", jeans: "30W", style: "clean, classy, street", hair_ok: true, free_5july: false, height: "6'1", suburb: "Greenbank", makeup_self: false, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Barong (cultural shirt)", portfolio: "" },
+  { name: "Muganza Hono", handle: "congolese_papi", gender: "Male", ethnicity: "African", followers: "4k+", phone: "0404222918", age: 22, agency: "no", top: "M", jeans: "34", style: "90s streetwear with a bit of swag. Baggy clothes, clean kicks", hair_ok: true, free_5july: true, height: "", suburb: "Culture", makeup_self: false, talent: false, talent_desc: "", cultural_piece: false, cultural_desc: "", portfolio: "" },
+  { name: "Peace Uwamahoro Sourire", handle: "Mahoro", gender: "Female", ethnicity: "African", followers: "500-1.5k", phone: "0435719742", age: 22, agency: "no", top: "S", jeans: "10", style: "Streetwear", hair_ok: true, free_5july: true, height: "5'7-5'9", suburb: "Logan", makeup_self: true, talent: true, talent_desc: "Singing", cultural_piece: true, cultural_desc: "Cultural clothing and props", portfolio: "" },
+  { name: "Mary Kris Valencia", handle: "krisvlnc", gender: "Female", ethnicity: "East Asian", followers: "500-1.5k", phone: "0416054432", age: 22, agency: "no", top: "XS", jeans: "4", style: "", hair_ok: true, free_5july: false, height: "5'6 and below", suburb: "Macgregor", makeup_self: false, talent: true, talent_desc: "Singing", cultural_piece: true, cultural_desc: "Filipiniana top", portfolio: "" },
+  { name: "Orlando Pentony", handle: "orlando.pentony", gender: "Male", ethnicity: "African", followers: "500-1.5k", phone: "0455947036", age: 18, agency: "no", top: "S", jeans: "28-32", style: "Streetwear", hair_ok: true, free_5july: true, height: "5'7-5'9", suburb: "Warner", makeup_self: false, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "South African rugby jersey", portfolio: "" },
+  { name: "Kowami Azanglo-Golou", handle: "", gender: "Male", ethnicity: "African", followers: "500-1.5k", phone: "0490118126", age: 26, agency: "no", top: "M", jeans: "32", style: "Clean and relaxed", hair_ok: true, free_5july: false, height: "5'11-6ft", suburb: "Moorooka", makeup_self: false, talent: true, talent_desc: "Music instrumental", cultural_piece: true, cultural_desc: "Tops dress shirts", portfolio: "" },
+  { name: "Yordiya Assa (Grace)", handle: "yordiiya", gender: "Female", ethnicity: "African", followers: "0-500", phone: "0421072038", age: 21, agency: "no", top: "S", jeans: "8", style: "ever-changing", hair_ok: true, free_5july: true, height: "5'9-5'10", suburb: "Springfield", makeup_self: true, talent: false, talent_desc: "", cultural_piece: false, cultural_desc: "", portfolio: "" },
+  { name: "Samson Fisis", handle: "samson.fisis", gender: "Male", ethnicity: "African", followers: "500-1.5k", phone: "0466286034", age: 21, agency: "no", top: "XL", jeans: "36/38", style: "Clean streetwear with luxury touches", hair_ok: true, free_5july: true, height: "6'3+", suburb: "Rochedale South", makeup_self: false, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Burundian cultural items", portfolio: "" },
+  { name: "Huseyin Islami", handle: "hynisel", gender: "Male", ethnicity: "Middle Eastern", followers: "0-500", phone: "0430379385", age: 20, agency: "no", top: "S", jeans: "W28 L32", style: "Classic, old money & star boy", hair_ok: true, free_5july: true, height: "5'9-5'10", suburb: "Loganlea", makeup_self: false, talent: true, talent_desc: "Singing", cultural_piece: false, cultural_desc: "", portfolio: "" },
+  { name: "Miguel Angelo Muzazaila", handle: "miguelmuzazaila", gender: "Male", ethnicity: "African", followers: "500-1.5k", phone: "0431490693", age: 19, agency: "agency", top: "S", jeans: "30", style: "Streetwear and Casual Formal", hair_ok: true, free_5july: true, height: "5'11-6ft", suburb: "Gold Coast", makeup_self: false, talent: true, talent_desc: "Guitar or Bass Guitar", cultural_piece: true, cultural_desc: "Capulana — Mozambican fabric", portfolio: "https://www.royallemodelling.com.au/models/queensland/model/men/2963721/miguel-muzazaila" },
+  { name: "Vesna Ama Bakarich-Davies", handle: "Vesna.b31", gender: "Female", ethnicity: "Other", followers: "0-500", phone: "0422280445", age: 20, agency: "no", top: "S", jeans: "8", style: "Elevated basics, street style and modern glam", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Browns Plains", makeup_self: true, talent: true, talent_desc: "Vocals", cultural_piece: true, cultural_desc: "Not sure yet", portfolio: "" },
+  { name: "Jolene Gabi", handle: "jjolenegabii", gender: "Female", ethnicity: "Polynesian / Pacific Islands", followers: "1.5-3.5k", phone: "0451017205", age: 20, agency: "no", top: "XS", jeans: "8", style: "Flexible — clean basics, experimental colours, accessory focused", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Fortitude Valley", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "To be confirmed", portfolio: "" },
+  { name: "Yevin Kwon", handle: "yevxvey", gender: "Female", ethnicity: "East Asian", followers: "500-1.5k", phone: "61402896037", age: 22, agency: "no", top: "XS", jeans: "26", style: "chic/y2k", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Brown Hills", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Korean traditional fits (hanbok inspired)", portfolio: "" },
+  { name: "Jay T", handle: "jjtrxnn", gender: "Female", ethnicity: "Other", followers: "500-1.5k", phone: "0492941324", age: 20, agency: "no", top: "S", jeans: "30-32", style: "streetwear", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Forest Lake", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Cultural shirt", portfolio: "" },
+  { name: "Katt Cole", handle: "kattcolee", gender: "Female", ethnicity: "Other", followers: "500-1.5k", phone: "0416143318", age: 21, agency: "no", top: "M", jeans: "28", style: "Maybe streetwear / classy", hair_ok: false, free_5july: false, height: "5'7-5'9", suburb: "Southport", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Jamaica flag/shirt", portfolio: "" },
+  { name: "Kia Sampson", handle: "K475222", gender: "Female", ethnicity: "African", followers: "0-500", phone: "0433862861", age: 22, agency: "no", top: "XS", jeans: "8", style: "Comfortable", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Logan Area", makeup_self: true, talent: false, talent_desc: "", cultural_piece: false, cultural_desc: "", portfolio: "" },
+  { name: "Irene Mwayuma", handle: "Mwayuma", gender: "Female", ethnicity: "African", followers: "500-1.5k", phone: "0403508654", age: 20, agency: "no", top: "S", jeans: "6", style: "Street wear", hair_ok: true, free_5july: true, height: "5'6 and below", suburb: "Bald Hills", makeup_self: true, talent: false, talent_desc: "", cultural_piece: true, cultural_desc: "Dresses and shirts in African material", portfolio: "" },
+];
+
+// Staff members
+const STAFF = {
+  hair: ["Christie", "Maria", "Neza"],
+  mua: ["Rebecca"],
+  stylist: ["Daniel", "Dee", "Komi"]
+};
+
+// ============================================================
+// STATE
+============================================================ */
+let currentUser = null;
+let currentRole = null; // 'admin' | 'staff' | 'model'
+let currentPage = null;
+let modelData = {}; // keyed by model name — from Supabase
+let inventoryData = [];
+
+// ============================================================
+// INIT
+============================================================ */
+window.addEventListener('DOMContentLoaded', async () => {
+  populateModelDropdown();
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await loadUser(session.user);
+  }
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      await loadUser(session.user);
+    } else if (event === 'SIGNED_OUT') {
+      showAuthScreen();
+    }
+  });
+});
+
+function populateModelDropdown() {
+  const sel = document.getElementById('su-model-name');
+  MODEL_ROSTER.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    sel.appendChild(opt);
+  });
+}
+
+async function loadUser(user) {
+  currentUser = user;
+  // Determine role from user metadata
+  const meta = user.user_metadata || {};
+  currentRole = meta.role || 'model';
+
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('sidebar-username').textContent = meta.display_name || user.email;
+  document.getElementById('sidebar-userrole').textContent = roleLabel(currentRole, meta);
+
+  buildNav();
+  await fetchModelData();
+  navigateTo(defaultPage());
+}
+
+function roleLabel(role, meta) {
+  if (role === 'admin') return 'Admin';
+  if (role === 'staff') return meta.staff_title || 'Staff';
+  return 'Model';
+}
+
+function defaultPage() {
+  if (currentRole === 'admin' || currentRole === 'staff') return 'dashboard';
+  return 'my-profile';
+}
+
+// ============================================================
+// SUPABASE DATA
+============================================================ */
+async function fetchModelData() {
+  const { data, error } = await sb.from('model_profiles').select('*');
+  if (data) {
+    data.forEach(r => { modelData[r.model_name] = r; });
+  }
+}
+
+async function fetchInventory() {
+  const { data } = await sb.from('inventory').select('*');
+  inventoryData = data || [];
+}
+
+async function upsertModelProfile(name, updates) {
+  const existing = modelData[name] || {};
+  const payload = { model_name: name, ...existing, ...updates, updated_at: new Date().toISOString() };
+  const { error } = await sb.from('model_profiles').upsert(payload, { onConflict: 'model_name' });
+  if (!error) { modelData[name] = payload; }
+  return !error;
+}
+
+async function upsertInventoryItem(item) {
+  const { error } = await sb.from('inventory').upsert(item, { onConflict: 'id' });
+  await fetchInventory();
+  return !error;
+}
+
+// ============================================================
+// NAVIGATION
+============================================================ */
+function buildNav() {
+  const nav = document.getElementById('sidebar-nav');
+  nav.innerHTML = '';
+
+  let items = [];
+  if (currentRole === 'admin' || currentRole === 'staff') {
+    items = [
+      { id: 'dashboard', icon: '◈', label: 'Dashboard' },
+      { id: 'models', icon: '◉', label: 'All Models' },
+      { id: 'inventory', icon: '◫', label: 'Inventory' },
+    ];
+  }
+  if (currentRole === 'model' || currentRole === 'admin') {
+    items.push({ id: 'my-profile', icon: '◎', label: 'My Profile' });
+  }
+  if (currentRole === 'model') {
+    items.push({ id: 'roster', icon: '◉', label: 'The Roster' });
+  }
+
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.className = 'nav-item';
+    btn.id = 'nav-' + item.id;
+    btn.innerHTML = `<span class="nav-icon">${item.icon}</span>${item.label}`;
+    btn.onclick = () => navigateTo(item.id);
+    nav.appendChild(btn);
+  });
+}
+
+function navigateTo(page) {
+  currentPage = page;
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById('nav-' + page);
+  if (btn) btn.classList.add('active');
+
+  const titleMap = { dashboard: 'Dashboard', models: 'All Models', inventory: 'Inventory', 'my-profile': 'My Profile', roster: 'The Roster' };
+  document.getElementById('topbar-title').textContent = titleMap[page] || '';
+
+  const content = document.getElementById('page-content');
+  if (page === 'dashboard') renderDashboard(content);
+  else if (page === 'models') renderModels(content);
+  else if (page === 'inventory') renderInventory(content);
+  else if (page === 'my-profile') renderMyProfile(content);
+  else if (page === 'roster') renderRoster(content);
+
+  // mobile: close sidebar
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('open');
+}
+
+// ============================================================
+// DASHBOARD
+============================================================ */
+function renderDashboard(el) {
+  const total = MODEL_ROSTER.length;
+  const approved = Object.values(modelData).filter(m => m.approved).length;
+  const withCultural = MODEL_ROSTER.filter(m => m.cultural_piece).length;
+  const withTalent = MODEL_ROSTER.filter(m => m.talent).length;
+  const notFree = MODEL_ROSTER.filter(m => !m.free_5july).length;
+
+  el.innerHTML = `
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-num">${total}</div><div class="stat-label">Total Applicants</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent)">${approved}</div><div class="stat-label">Approved</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent2)">${total - approved}</div><div class="stat-label">Pending</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--blue)">${withCultural}</div><div class="stat-label">Has Cultural Piece</div></div>
+      <div class="stat-card"><div class="stat-num">${withTalent}</div><div class="stat-label">Has Talent</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--accent2)">${notFree}</div><div class="stat-label">Busy Morning</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:28px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:14px;text-transform:uppercase">Hair Team</div>
+        ${STAFF.hair.map(n => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${n}</span><span style="font-size:11px;color:var(--text-dim)">${Object.values(modelData).filter(m=>m.hair_stylist===n).length} assigned</span></div>`).join('')}
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px">
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:14px;text-transform:uppercase">Stylist Team</div>
+        ${STAFF.stylist.map(n => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${n}</span><span style="font-size:11px;color:var(--text-dim)">${Object.values(modelData).filter(m=>m.stylist===n).length} assigned</span></div>`).join('')}
+        ${STAFF.mua.map(n => `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span>${n} <span style="font-size:10px;color:var(--text-dim)">(MUA)</span></span><span style="font-size:11px;color:var(--text-dim)">${Object.values(modelData).filter(m=>m.mua===n).length} assigned</span></div>`).join('')}
+      </div>
+    </div>
+
+    <div style="font-family:var(--font-display);font-size:20px;letter-spacing:.08em;margin-bottom:16px">QUICK ACTIONS</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <button class="btn btn-sm btn-ghost" onclick="navigateTo('models')">→ View All Models</button>
+      <button class="btn btn-sm btn-ghost" onclick="navigateTo('inventory')">→ Manage Inventory</button>
+    </div>
+  `;
+}
+
+// ============================================================
+// MODELS PAGE
+============================================================ */
+let filterGender = '';
+let filterEthnicity = '';
+let filterStatus = '';
+let searchQ = '';
+
+function renderModels(el) {
+  el.innerHTML = `
+    <div class="filter-bar">
+      <input type="text" placeholder="Search name, handle, suburb…" oninput="searchQ=this.value;renderModelCards()" id="search-input"/>
+      <select onchange="filterGender=this.value;renderModelCards()">
+        <option value="">All Genders</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+      <select onchange="filterEthnicity=this.value;renderModelCards()">
+        <option value="">All Ethnicities</option>
+        <option value="African">African</option>
+        <option value="East Asian">East Asian</option>
+        <option value="Middle Eastern">Middle Eastern</option>
+        <option value="South Asian">South Asian</option>
+        <option value="Polynesian / Pacific Islands">Polynesian / Pacific Islands</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="filter-bar" style="margin-top:-12px;margin-bottom:20px">
+      <button class="filter-chip ${filterStatus===''?'active':''}" onclick="filterStatus='';this.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderModelCards()">All</button>
+      <button class="filter-chip ${filterStatus==='approved'?'active':''}" onclick="filterStatus='approved';this.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderModelCards()">Approved</button>
+      <button class="filter-chip ${filterStatus==='pending'?'active':''}" onclick="filterStatus='pending';this.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderModelCards()">Pending</button>
+      <button class="filter-chip" onclick="filterStatus='cultural';this.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderModelCards()">Has Cultural</button>
+      <button class="filter-chip" onclick="filterStatus='talent';this.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderModelCards()">Has Talent</button>
+      <button class="filter-chip" onclick="filterStatus='busy';this.closest('.filter-bar').querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));this.classList.add('active');renderModelCards()">⚠ Busy Jul 5 AM</button>
+    </div>
+    <div class="model-grid" id="model-grid"></div>
+  `;
+  renderModelCards();
+}
+
+function renderModelCards() {
+  let filtered = MODEL_ROSTER.filter(m => {
+    const db = modelData[m.name] || {};
+    if (filterGender && m.gender !== filterGender) return false;
+    if (filterEthnicity && !m.ethnicity.includes(filterEthnicity)) return false;
+    if (filterStatus === 'approved' && !db.approved) return false;
+    if (filterStatus === 'pending' && db.approved) return false;
+    if (filterStatus === 'cultural' && !m.cultural_piece) return false;
+    if (filterStatus === 'talent' && !m.talent) return false;
+    if (filterStatus === 'busy' && m.free_5july) return false;
+    if (searchQ) {
+      const q = searchQ.toLowerCase();
+      if (!m.name.toLowerCase().includes(q) && !m.handle.toLowerCase().includes(q) && !m.suburb.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const grid = document.getElementById('model-grid');
+  if (!grid) return;
+  grid.innerHTML = filtered.map(m => modelCard(m)).join('');
+}
+
+function modelCard(m) {
+  const db = modelData[m.name] || {};
+  const approved = db.approved || false;
+  const initials = m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const customTags = (db.tags || []).map(t => `<span class="tag tag-custom">${t}</span>`).join('');
+  const allStaff = [...STAFF.hair, ...STAFF.mua, ...STAFF.stylist];
+
+  return `
+    <div class="model-card ${approved?'approved':''}" onclick="openModal('${m.name}')">
+      <div class="card-header">
+        <div class="card-avatar">${db.avatar_url ? `<img src="${db.avatar_url}" alt=""/>` : initials}</div>
+        <div class="card-name-block">
+          <div class="card-name">${m.name}</div>
+          <div class="card-handle">@${m.handle || '—'}</div>
+        </div>
+        <div class="card-status">
+          <span class="badge ${approved?'badge-approved':'badge-pending'}">${approved?'✓ Approved':'Pending'}</span>
+          <span class="badge ${m.gender==='Male'?'badge-gender-male':'badge-gender-female'}">${m.gender}</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="badge badge-ethnicity">${m.ethnicity}</span>
+          ${m.talent ? `<span class="talent-pill">🎤 ${m.talent_desc||'Talent'}</span>` : ''}
+          ${m.agency!=='no' ? `<span class="badge badge-agency">Signed</span>` : ''}
+          ${!m.free_5july ? `<span class="badge" style="background:rgba(255,77,0,.1);color:var(--accent2)">⚠ Busy AM</span>` : ''}
+          ${customTags}
+        </div>
+        <div class="card-detail-row"><span>Size</span><span>Top ${m.top} · Jean ${m.jeans}</span></div>
+        <div class="card-detail-row"><span>Height</span><span>${m.height||'—'}</span></div>
+        <div class="card-detail-row"><span>Suburb</span><span>${m.suburb}</span></div>
+        ${m.cultural_piece ? `<div class="card-detail-row"><span>Cultural</span><span>${m.cultural_desc}</span></div>` : ''}
+        ${db.stylist ? `<div class="card-detail-row"><span>Stylist</span><span style="color:var(--accent)">${db.stylist}</span></div>` : ''}
+        ${db.hair_stylist ? `<div class="card-detail-row"><span>Hair</span><span style="color:var(--accent)">${db.hair_stylist}</span></div>` : ''}
+        ${db.mua ? `<div class="card-detail-row"><span>MUA</span><span style="color:var(--accent)">${db.mua}</span></div>` : ''}
+      </div>
+      <div class="card-footer" onclick="event.stopPropagation()">
+        <select class="stylist-assign" onchange="assignStaff('${m.name}','stylist',this.value)" title="Assign Stylist">
+          <option value="">Stylist…</option>
+          ${STAFF.stylist.map(s=>`<option value="${s}" ${db.stylist===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <select class="stylist-assign" onchange="assignStaff('${m.name}','hair_stylist',this.value)" title="Assign Hair">
+          <option value="">Hair…</option>
+          ${STAFF.hair.map(s=>`<option value="${s}" ${db.hair_stylist===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        <button class="approve-btn ${approved?'approved-state':''}" onclick="toggleApprove('${m.name}')">${approved?'✓ Approved':'Approve'}</button>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================
+// APPROVE & ASSIGN
+============================================================ */
+async function toggleApprove(name) {
+  const db = modelData[name] || {};
+  const newVal = !db.approved;
+  const ok = await upsertModelProfile(name, { approved: newVal });
+  if (ok) {
+    toast(`${name} ${newVal?'approved ✓':'unapproved'}`, !newVal);
+    renderModelCards();
+  }
+}
+
+async function assignStaff(name, field, value) {
+  const ok = await upsertModelProfile(name, { [field]: value });
+  if (ok) {
+    toast(`Assigned ${value} to ${name.split(' ')[0]}`);
+    renderModelCards();
+  }
+}
+
+// ============================================================
+// MODEL DETAIL MODAL
+============================================================ */
+function openModal(name) {
+  const m = MODEL_ROSTER.find(x => x.name === name);
+  if (!m) return;
+  const db = modelData[name] || {};
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  document.getElementById('modal-name').textContent = m.name;
+  document.getElementById('modal-handle').textContent = m.handle ? `@${m.handle}` : '';
+
+  const canEdit = currentRole === 'admin' || currentRole === 'staff';
+
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-section">
+      <div class="modal-section-title">Application Details</div>
+      <div class="detail-grid">
+        <div class="detail-item"><label>Age</label><div class="val">${m.age}</div></div>
+        <div class="detail-item"><label>Gender</label><div class="val">${m.gender}</div></div>
+        <div class="detail-item"><label>Ethnicity</label><div class="val">${m.ethnicity}</div></div>
+        <div class="detail-item"><label>Height</label><div class="val">${m.height||'—'}</div></div>
+        <div class="detail-item"><label>Top Size</label><div class="val">${m.top}</div></div>
+        <div class="detail-item"><label>Jean Size</label><div class="val">${m.jeans}</div></div>
+        <div class="detail-item"><label>Followers</label><div class="val">${m.followers}</div></div>
+        <div class="detail-item"><label>Suburb</label><div class="val">${m.suburb}</div></div>
+        <div class="detail-item"><label>Phone</label><div class="val">${canEdit ? m.phone : '—'}</div></div>
+        <div class="detail-item"><label>Agency</label><div class="val">${m.agency}</div></div>
+        <div class="detail-item"><label>Free All Day Jul 5</label><div class="val">${m.free_5july?'Yes':'⚠ Busy AM only'}</div></div>
+        <div class="detail-item"><label>Hair Change OK</label><div class="val">${m.hair_ok?'Yes':'No'}</div></div>
+        <div class="detail-item"><label>Makeup Self</label><div class="val">${m.makeup_self?'Yes':'Needs MUA'}</div></div>
+        <div class="detail-item"><label>Style</label><div class="val">${m.style||'—'}</div></div>
+      </div>
+    </div>
+
+    ${m.talent ? `
+    <div class="modal-section">
+      <div class="modal-section-title">Talent / Performance</div>
+      <div class="val" style="font-size:14px">${m.talent_desc}</div>
+    </div>` : ''}
+
+    ${m.cultural_piece ? `
+    <div class="modal-section">
+      <div class="modal-section-title">Cultural Piece</div>
+      <div class="val" style="font-size:14px">${m.cultural_desc}</div>
+    </div>` : ''}
+
+    ${m.portfolio ? `
+    <div class="modal-section">
+      <div class="modal-section-title">Portfolio</div>
+      <a href="${m.portfolio}" target="_blank" style="color:var(--accent);font-size:13px;font-family:var(--font-mono)">→ View Portfolio</a>
+    </div>` : ''}
+
+    ${canEdit ? `
+    <div class="modal-section">
+      <div class="modal-section-title">Staff Assignment</div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <label>Stylist</label>
+          <select onchange="assignStaff('${name}','stylist',this.value)">
+            <option value="">Unassigned</option>
+            ${STAFF.stylist.map(s=>`<option value="${s}" ${db.stylist===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="detail-item">
+          <label>Hair Stylist</label>
+          <select onchange="assignStaff('${name}','hair_stylist',this.value)">
+            <option value="">Unassigned</option>
+            ${STAFF.hair.map(s=>`<option value="${s}" ${db.hair_stylist===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="detail-item">
+          <label>Makeup Artist</label>
+          <select onchange="assignStaff('${name}','mua',this.value)">
+            <option value="">Unassigned</option>
+            ${STAFF.mua.map(s=>`<option value="${s}" ${db.mua===s?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="detail-item">
+          <label>Status</label>
+          <button class="btn btn-sm ${db.approved?'':'btn-ghost'}" onclick="toggleApprove('${name}');closeModal()">${db.approved?'✓ Approved — Click to Undo':'Approve Model'}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <div class="modal-section-title">Tags (Custom)</div>
+      <div class="tag-input-row">
+        <input type="text" id="tag-input-${name.replace(/\s/g,'_')}" placeholder="Add a tag (e.g. lead, opening, needs alterations)…" onkeydown="if(event.key==='Enter')addTag('${name}')"/>
+        <button class="btn btn-sm" style="width:auto;padding:8px 14px" onclick="addTag('${name}')">+</button>
+      </div>
+      <div class="tags-display" id="tags-display-${name.replace(/\s/g,'_')}">
+        ${(db.tags||[]).map(t=>`<button class="tag-remove" onclick="removeTag('${name}','${t}')">${t}<span class="x">×</span></button>`).join('')}
+      </div>
+    </div>
+
+    <div class="modal-section notes-area">
+      <div class="modal-section-title">Internal Notes</div>
+      <textarea id="notes-${name.replace(/\s/g,'_')}" placeholder="Notes for the team…" onblur="saveNotes('${name}')">${db.notes||''}</textarea>
+    </div>` : ''}
+
+    <div class="modal-section">
+      <div class="modal-section-title">Photos</div>
+      ${(db.photos||[]).length > 0 ? `
+        <div class="photo-grid">
+          ${(db.photos||[]).map(url=>`<div class="photo-thumb"><img src="${url}" alt=""/></div>`).join('')}
+        </div>` : `<div style="font-size:13px;color:var(--text-dim)">No photos uploaded yet</div>`}
+    </div>
+  `;
+
+  document.getElementById('model-modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('model-modal').classList.add('hidden'); }
+function closeModalOnOverlay(e) { if (e.target.id === 'model-modal') closeModal(); }
+
+async function addTag(name) {
+  const key = name.replace(/\s/g,'_');
+  const input = document.getElementById(`tag-input-${key}`);
+  const val = input.value.trim();
+  if (!val) return;
+  const db = modelData[name] || {};
+  const tags = [...(db.tags||[])];
+  if (!tags.includes(val)) tags.push(val);
+  await upsertModelProfile(name, { tags });
+  input.value = '';
+  document.getElementById(`tags-display-${key}`).innerHTML =
+    tags.map(t=>`<button class="tag-remove" onclick="removeTag('${name}','${t}')">${t}<span class="x">×</span></button>`).join('');
+  toast(`Tag added: ${val}`);
+}
+
+async function removeTag(name, tag) {
+  const db = modelData[name] || {};
+  const tags = (db.tags||[]).filter(t=>t!==tag);
+  await upsertModelProfile(name, { tags });
+  const key = name.replace(/\s/g,'_');
+  if (document.getElementById(`tags-display-${key}`)) {
+    document.getElementById(`tags-display-${key}`).innerHTML =
+      tags.map(t=>`<button class="tag-remove" onclick="removeTag('${name}','${t}')">${t}<span class="x">×</span></button>`).join('');
+  }
+}
+
+async function saveNotes(name) {
+  const key = name.replace(/\s/g,'_');
+  const el = document.getElementById(`notes-${key}`);
+  if (!el) return;
+  await upsertModelProfile(name, { notes: el.value });
+  toast('Notes saved');
+}
+
+// ============================================================
+// INVENTORY PAGE
+============================================================ */
+async function renderInventory(el) {
+  el.innerHTML = `<div class="loading-screen"><div class="loader"></div></div>`;
+  await fetchInventory();
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div style="font-size:13px;color:var(--text-dim)">${inventoryData.length} items</div>
+      ${currentRole==='admin'?`<button class="btn btn-sm" onclick="openAddInventory()">+ Add Item</button>`:''}
+    </div>
+    <div class="inv-grid" id="inv-grid">
+      ${inventoryData.map(invCard).join('')}
+      ${currentRole==='admin'?`<button class="add-inv-btn" onclick="openAddInventory()">+ Add Inventory Item</button>`:''}
+    </div>
+    <div class="modal-overlay hidden" id="inv-modal" onclick="if(event.target.id==='inv-modal')document.getElementById('inv-modal').classList.add('hidden')">
+      <div class="modal" style="max-width:460px">
+        <div class="modal-header">
+          <div style="font-family:var(--font-display);font-size:20px;letter-spacing:.05em">Add Inventory Item</div>
+          <button class="modal-close" onclick="document.getElementById('inv-modal').classList.add('hidden')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group"><label>Item Name</label><input id="inv-name" placeholder="e.g. Cream oversized blazer"/></div>
+          <div class="form-group"><label>Category</label>
+            <select id="inv-cat">
+              <option value="Top">Top</option><option value="Bottom">Bottom</option>
+              <option value="Outerwear">Outerwear</option><option value="Accessory">Accessory</option>
+              <option value="Shoes">Shoes</option><option value="Full look">Full Look</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Size / Qty</label><input id="inv-size" placeholder="e.g. S/M, one size, x3"/></div>
+          <div class="form-group"><label>Assign to Model (optional)</label>
+            <select id="inv-model">
+              <option value="">Unassigned</option>
+              ${MODEL_ROSTER.map(m=>`<option value="${m.name}">${m.name}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group"><label>Notes</label><textarea id="inv-notes" placeholder="Colour, condition, styling notes…"></textarea></div>
+          <button class="btn" onclick="saveInventoryItem()">Save Item</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function invCard(item) {
+  return `
+    <div class="inv-card">
+      <div class="inv-card-name">${item.name}</div>
+      <div class="inv-card-meta">${item.category} · ${item.size_qty||'—'}</div>
+      ${item.assigned_model ? `<div class="inv-assigned">→ ${item.assigned_model}</div>` : `<div style="font-size:12px;color:var(--text-dim)">Unassigned</div>`}
+      ${item.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-top:8px">${item.notes}</div>` : ''}
+    </div>
+  `;
+}
+
+function openAddInventory() {
+  document.getElementById('inv-modal').classList.remove('hidden');
+}
+
+async function saveInventoryItem() {
+  const item = {
+    id: Date.now().toString(),
+    name: document.getElementById('inv-name').value.trim(),
+    category: document.getElementById('inv-cat').value,
+    size_qty: document.getElementById('inv-size').value.trim(),
+    assigned_model: document.getElementById('inv-model').value,
+    notes: document.getElementById('inv-notes').value.trim(),
+  };
+  if (!item.name) { toast('Enter item name', true); return; }
+  const ok = await upsertInventoryItem(item);
+  if (ok) {
+    toast('Item added ✓');
+    document.getElementById('inv-modal').classList.add('hidden');
+    renderInventory(document.getElementById('page-content'));
+  }
+}
+
+// ============================================================
+// MODEL SELF VIEW
+============================================================ */
+function renderMyProfile(el) {
+  const meta = currentUser?.user_metadata || {};
+  const name = meta.display_name || '';
+  const m = MODEL_ROSTER.find(x => x.name === name);
+  const db = modelData[name] || {};
+
+  if (!m) {
+    el.innerHTML = `<div class="loading-screen" style="flex-direction:column;gap:12px">
+      <div>No profile found for your account.</div>
+      <div style="font-size:12px;color:var(--text-dim)">Contact your coordinator if this is wrong.</div>
+    </div>`;
+    return;
+  }
+
+  const approved = db.approved || false;
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  el.innerHTML = `
+    <div class="model-profile-card">
+      <div class="model-profile-header">
+        <div class="profile-avatar">${db.avatar_url ? `<img src="${db.avatar_url}"/>` : initials}</div>
+        <div>
+          <div class="profile-name">${m.name}</div>
+          <div class="profile-handle">@${m.handle||'—'}</div>
+          <div class="profile-status-row">
+            <span class="badge ${approved?'badge-approved':'badge-pending'}">${approved?'✓ Approved':'Pending Approval'}</span>
+            <span class="badge badge-gender-${m.gender.toLowerCase()}">${m.gender}</span>
+            <span class="badge badge-ethnicity">${m.ethnicity}</span>
+          </div>
+        </div>
+      </div>
+      <div class="model-profile-body">
+
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:14px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border)">Your Details</div>
+        <div class="detail-grid" style="margin-bottom:28px">
+          <div class="detail-item"><label>Age</label><div class="val">${m.age}</div></div>
+          <div class="detail-item"><label>Height</label><div class="val">${m.height||'—'}</div></div>
+          <div class="detail-item"><label>Top</label><div class="val">${m.top}</div></div>
+          <div class="detail-item"><label>Jeans</label><div class="val">${m.jeans}</div></div>
+          <div class="detail-item"><label>Style</label><div class="val">${m.style||'—'}</div></div>
+          <div class="detail-item"><label>Cultural Piece</label><div class="val">${m.cultural_piece ? m.cultural_desc : 'None'}</div></div>
+        </div>
+
+        ${db.stylist || db.hair_stylist || db.mua ? `
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:14px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border)">Your Team</div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:28px">
+          ${db.stylist ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px"><div style="font-size:10px;color:var(--text-dim);margin-bottom:3px">STYLIST</div>${db.stylist}</div>` : ''}
+          ${db.hair_stylist ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px"><div style="font-size:10px;color:var(--text-dim);margin-bottom:3px">HAIR</div>${db.hair_stylist}</div>` : ''}
+          ${db.mua ? `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;font-size:13px"><div style="font-size:10px;color:var(--text-dim);margin-bottom:3px">MAKEUP</div>${db.mua}</div>` : ''}
+        </div>` : ''}
+
+        ${db.notes ? `
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border)">Notes from Team</div>
+        <div style="font-size:14px;margin-bottom:28px">${db.notes}</div>` : ''}
+
+        <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:14px;text-transform:uppercase;padding-bottom:8px;border-bottom:1px solid var(--border)">Upload Photos</div>
+        <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px">Upload your base fit photos, hair inspo, and makeup inspo below.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label>Base Fit Photos</label>
+            <div class="photo-upload-area" onclick="document.getElementById('upload-fit').click()">
+              <input type="file" id="upload-fit" multiple accept="image/*" onchange="handleUpload(this,'fit','${name}')"/>
+              <div style="font-size:24px;margin-bottom:6px">📸</div>
+              <div style="font-size:13px">Tap to upload fits</div>
+            </div>
+          </div>
+          <div>
+            <label>Hair Inspo</label>
+            <div class="photo-upload-area" onclick="document.getElementById('upload-hair').click()">
+              <input type="file" id="upload-hair" multiple accept="image/*" onchange="handleUpload(this,'hair','${name}')"/>
+              <div style="font-size:24px;margin-bottom:6px">💇</div>
+              <div style="font-size:13px">Tap to upload</div>
+            </div>
+          </div>
+          <div>
+            <label>Makeup Inspo</label>
+            <div class="photo-upload-area" onclick="document.getElementById('upload-mua').click()">
+              <input type="file" id="upload-mua" multiple accept="image/*" onchange="handleUpload(this,'mua','${name}')"/>
+              <div style="font-size:24px;margin-bottom:6px">💄</div>
+              <div style="font-size:13px">Tap to upload</div>
+            </div>
+          </div>
+        </div>
+        <div id="upload-status" style="font-size:13px;color:var(--text-dim);margin-top:12px"></div>
+
+        ${(db.photos||[]).length > 0 ? `
+        <div style="margin-top:24px">
+          <div style="font-family:var(--font-mono);font-size:10px;letter-spacing:.12em;color:var(--text-dim);margin-bottom:10px;text-transform:uppercase">Uploaded</div>
+          <div class="photo-grid">${(db.photos||[]).map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+}
+
+async function handleUpload(input, type, modelName) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  const status = document.getElementById('upload-status');
+  status.textContent = 'Uploading…';
+  const urls = [];
+  for (const file of files) {
+    const path = `${modelName.replace(/\s/g,'_')}/${type}/${Date.now()}_${file.name}`;
+    const { data, error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: { publicUrl } } = sb.storage.from('model-photos').getPublicUrl(path);
+      urls.push(publicUrl);
+    }
+  }
+  const db = modelData[modelName] || {};
+  const existing = db.photos || [];
+  await upsertModelProfile(modelName, { photos: [...existing, ...urls] });
+  status.textContent = `✓ ${urls.length} photo(s) uploaded`;
+  toast('Photos uploaded ✓');
+}
+
+// ============================================================
+// ROSTER (models see limited view of other models)
+============================================================ */
+function renderRoster(el) {
+  el.innerHTML = `
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:20px">Your fellow models for the Brisbane Runway show — Jul 5, 2026.</p>
+    <div class="roster-list">
+      ${MODEL_ROSTER.map(m => {
+        const initials = m.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        return `
+        <div class="roster-card">
+          <div class="roster-avatar">${initials}</div>
+          <div class="roster-info">
+            <div class="roster-name">${m.name}</div>
+            <div class="roster-handle">${m.handle ? `@${m.handle}` : m.ethnicity}</div>
+          </div>
+          <span class="badge badge-gender-${m.gender.toLowerCase()}">${m.gender}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+}
+
+// ============================================================
+// AUTH
+============================================================ */
+function showAuthTab(tab) {
+  document.getElementById('tab-signin').classList.toggle('hidden', tab !== 'signin');
+  document.getElementById('tab-signup').classList.toggle('hidden', tab !== 'signup');
+  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='signin')||(i===1&&tab==='signup')));
+}
+
+function onRoleChange() {
+  const role = document.getElementById('su-role').value;
+  document.getElementById('model-name-group').classList.toggle('hidden', role !== 'model');
+  document.getElementById('staff-name-group').classList.toggle('hidden', role !== 'staff');
+  document.getElementById('su-email-group').classList.toggle('hidden', !role);
+  document.getElementById('su-pass-group').classList.toggle('hidden', !role);
+  document.getElementById('su-btn').classList.toggle('hidden', !role);
+}
+
+async function signIn() {
+  const email = document.getElementById('si-email').value.trim();
+  const pass = document.getElementById('si-pass').value;
+  document.getElementById('si-error').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) document.getElementById('si-error').textContent = error.message;
+}
+
+async function signUp() {
+  const role = document.getElementById('su-role').value;
+  const email = document.getElementById('su-email').value.trim();
+  const pass = document.getElementById('su-pass').value;
+  document.getElementById('su-error').textContent = '';
+
+  let displayName = '';
+  let staffTitle = '';
+  if (role === 'model') {
+    displayName = document.getElementById('su-model-name').value;
+    if (!displayName) { document.getElementById('su-error').textContent = 'Please select your name.'; return; }
+  } else if (role === 'staff') {
+    const sel = document.getElementById('su-staff-name').value;
+    if (!sel) { document.getElementById('su-error').textContent = 'Please select your name.'; return; }
+    displayName = sel.split(' — ')[0];
+    staffTitle = sel.split(' — ')[1] || '';
+  }
+
+  const { error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { role, display_name: displayName, staff_title: staffTitle } }
+  });
+  if (error) { document.getElementById('su-error').textContent = error.message; return; }
+  toast('Account created! Check your email to confirm.');
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+}
+
+function showAuthScreen() {
+  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app').classList.add('hidden');
+  currentUser = null;
+  currentRole = null;
+  modelData = {};
+}
+
+// ============================================================
+// MOBILE SIDEBAR
+============================================================ */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('open');
+}
+
+// ============================================================
+// TOAST
+============================================================ */
+let toastTimer;
+function toast(msg, isError=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show' + (isError?' error':'');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3000);
+}
+</script>
+</body>
+</html>
