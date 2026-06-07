@@ -71,9 +71,65 @@
               <div class="form-group">
                 <label>Select Your Name</label>
                 <div class="select-wrap">
-                  <select id="signup-name">
+                  <select id="signup-name" onchange="showExistingModelExtras()">
                     <option value="">— choose your name —</option>
                   </select>
+                </div>
+              </div>
+              <!-- Show after name selected -->
+              <div id="existing-model-extras" class="hidden">
+                <div class="form-group">
+                  <label>Profile Photo</label>
+                  <div class="profile-photo-upload">
+                    <div class="profile-photo-preview" id="existing-profile-preview" onclick="document.getElementById('existing-profile-input').click()">
+                      📸
+                      <input type="file" id="existing-profile-input" accept="image/*" onchange="previewExistingProfile(this)"/>
+                    </div>
+                    <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to add your profile photo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Ethnicity / Country</label>
+                  <div class="select-wrap">
+                    <select id="existing-ethnicity">
+                      <option value="">Select your country</option>
+                      <option value="Australian">🇦🇺 Australian</option>
+                      <option value="Burundian">🇧🇮 Burundian</option>
+                      <option value="Cameroonian">🇨🇲 Cameroonian</option>
+                      <option value="Chinese">🇨🇳 Chinese</option>
+                      <option value="Congolese">🇨🇩 Congolese</option>
+                      <option value="Ethiopian">🇪🇹 Ethiopian</option>
+                      <option value="Filipino">🇵🇭 Filipino</option>
+                      <option value="Ghanaian">🇬🇭 Ghanaian</option>
+                      <option value="Indian">🇮🇳 Indian</option>
+                      <option value="Indonesian">🇮🇩 Indonesian</option>
+                      <option value="Ivorian">🇨🇮 Ivorian</option>
+                      <option value="Jamaican">🇯🇲 Jamaican</option>
+                      <option value="Japanese">🇯🇵 Japanese</option>
+                      <option value="Kenyan">🇰🇪 Kenyan</option>
+                      <option value="Korean">🇰🇷 Korean</option>
+                      <option value="Lebanese">🇱🇧 Lebanese</option>
+                      <option value="Mozambican">🇲🇿 Mozambican</option>
+                      <option value="Nigerian">🇳🇬 Nigerian</option>
+                      <option value="Pakistani">🇵🇰 Pakistani</option>
+                      <option value="Rwandan">🇷🇼 Rwandan</option>
+                      <option value="Samoan">🇼🇸 Samoan</option>
+                      <option value="Seychellois">🇸🇨 Seychellois</option>
+                      <option value="Sierra Leonean">🇸🇱 Sierra Leonean</option>
+                      <option value="Somali">🇸🇴 Somali</option>
+                      <option value="South African">🇿🇦 South African</option>
+                      <option value="Sri Lankan">🇱🇰 Sri Lankan</option>
+                      <option value="Sudanese">🇸🇩 Sudanese</option>
+                      <option value="Swiss">🇨🇭 Swiss</option>
+                      <option value="Tanzanian">🇹🇿 Tanzanian</option>
+                      <option value="Togolese">🇹🇬 Togolese</option>
+                      <option value="Tongan">🇹🇴 Tongan</option>
+                      <option value="Ugandan">🇺🇬 Ugandan</option>
+                      <option value="Vietnamese">🇻🇳 Vietnamese</option>
+                      <option value="Zimbabwean">🇿🇼 Zimbabwean</option>
+                      <option value="Other">🌍 Other</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -318,23 +374,22 @@
         </div>
       </div>
       <div id="admin-models-panel" class="panel-content">
-        <div class="filter-row" id="admin-filter-row">
-          <button class="chip active" onclick="setChip(this,'all')">All</button>
-          <button class="chip" onclick="setChip(this,'approved')">Approved</button>
-          <button class="chip" onclick="setChip(this,'pending')">Pending</button>
-          <button class="chip" onclick="setChip(this,'checklist')">⚠ Incomplete</button>
-          <button class="chip" onclick="setChip(this,'cultural')">Has Cultural</button>
-          <button class="chip" onclick="setChip(this,'talent')">Has Talent</button>
-          <button class="chip" onclick="setChip(this,'busy')">Busy AM</button>
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="setAdminTab(this,'all')">All</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'approved')">Approved</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'pending')">Pending</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'inventory')">Inventory</button>
         </div>
-        <div class="model-grid" id="admin-model-grid"></div>
-      </div>
-      <div id="admin-inventory-panel" class="panel-content hidden">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-          <span class="dim-text" id="inv-count">0 items</span>
-          <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+        <div id="models-tab-content">
+          <div class="model-grid" id="admin-model-grid"></div>
         </div>
-        <div class="inv-grid" id="inv-grid"></div>
+        <div id="inventory-tab-content" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <span class="dim-text" id="inv-count">0 items</span>
+            <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+          </div>
+          <div class="inv-grid" id="inv-grid"></div>
+        </div>
       </div>
       <div id="admin-team-panel" class="panel-content hidden">
         <div class="team-grid" id="team-grid"></div>
@@ -365,7 +420,21 @@
         </div>
       </div>
       <div class="panel-content">
-        <div class="model-grid" id="staff-model-grid"></div>
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
+          <button class="tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
+          <button class="tab-btn" onclick="setStaffTab(this,'inventory')">Inventory</button>
+        </div>
+        <div id="staff-models-content">
+          <div class="model-grid" id="staff-model-grid"></div>
+        </div>
+        <div id="staff-inventory-content" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <span class="dim-text" id="staff-inv-count">0 items</span>
+            <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+          </div>
+          <div class="inv-grid" id="staff-inv-grid"></div>
+        </div>
       </div>
     </main>
   </section>
@@ -402,7 +471,18 @@
         <button class="panel-close" onclick="document.getElementById('inv-modal-overlay').classList.add('hidden')">✕</button>
       </div>
       <div class="modal-body">
-        <div class="form-group"><label>Item Name</label><input id="inv-name" placeholder="e.g. Cream oversized blazer"/></div>
+        <div class="form-group">
+          <label>Photo of Item</label>
+          <div class="inv-photo-preview" id="inv-photo-preview" onclick="document.getElementById('inv-photo-input').click()">
+            <input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
+            <div id="inv-photo-placeholder">
+              <div style="font-size:28px;margin-bottom:6px">👕</div>
+              <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group"><label>Item Name <span style="color:var(--dim)">(optional)</span></label><input id="inv-name" placeholder="e.g. Cream oversized blazer"/></div>
+        <div class="form-group"><label>Size <span style="color:var(--dim)">(optional)</span></label><input id="inv-size" placeholder="e.g. S/M, 32, one size"/></div>
         <div class="form-group"><label>Category</label>
           <div class="select-wrap">
             <select id="inv-cat">
@@ -415,13 +495,11 @@
             </select>
           </div>
         </div>
-        <div class="form-group"><label>Size / Qty</label><input id="inv-size" placeholder="e.g. S/M, one size, x3"/></div>
-        <div class="form-group"><label>Assign to Model</label>
+        <div class="form-group"><label>Assign to Model <span style="color:var(--dim)">(optional)</span></label>
           <div class="select-wrap">
             <select id="inv-model-assign"><option value="">Unassigned</option></select>
           </div>
         </div>
-        <div class="form-group"><label>Notes</label><textarea id="inv-notes" placeholder="Colour, condition, notes…"></textarea></div>
         <button class="btn btn-brown" onclick="saveInvItem()">Save Item</button>
       </div>
     </div>
