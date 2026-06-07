@@ -1,388 +1,271 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>VDG Casting Panel</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com"/>
-    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
-    <style>
-        /* ============================================================
-           Global Tokens & Reset
-        =================================================== */
-        :root {
-            --black: #0c0c0c;
-            --white: #ffffff;
-            --accent: #c0392b;
-            --border: #e2e2de;
-            --radius: 18px;
-            --font-display: 'Cormorant Garamond', serif;
-            --font-body: 'Instrument Sans', sans-serif;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VDG Event Portal</title>
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 
-        body {
-            background: var(--black);
-            color: var(--white);
-            font-family: var(--font-body);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-            padding: 40px 20px;
-        }
-
-        /* Main dashboard panel */
-        .main {
-            background: var(--white);
-            color: var(--black);
-            border-radius: var(--radius);
-            width: 100%;
-            max-width: 1000px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-        }
-
-        .topbar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 36px;
-            border-bottom: 1px solid var(--border);
-            padding-bottom: 12px;
-        }
-
-        .topbar-title {
-            font-family: var(--font-display);
-            font-size: 28px;
-            letter-spacing: 0.06em;
-            font-weight: 400;
-        }
-
-        .model-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 24px;
-        }
-
-        .model-card {
-            background: var(--white);
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-            overflow: hidden;
-            transition: transform 0.2s;
-        }
-
-        .model-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .card-header {
-            padding: 20px;
-            background: var(--black);
-            color: var(--white);
-            display: flex;
-            flex-direction: column;
-        }
-
-        .card-name {
-            font-family: var(--font-display);
-            font-size: 22px;
-            font-weight: 600;
-        }
-
-        .card-handle {
-            font-family: var(--font-body);
-            font-size: 14px;
-            color: var(--border);
-            margin-top: 4px;
-        }
-
-        .card-body {
-            padding: 20px;
-            background: var(--white);
-        }
-
-        .card-body p {
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
-
-        .card-body label {
-            font-weight: 500;
-            display: block;
-            margin-bottom: 4px;
-            font-size: 12px;
-            color: var(--black);
-        }
-
-        .assign-section {
-            margin-top: 12px;
-        }
-
-        select, button {
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 10px;
-            width: 100%;
-            font-size: 14px;
-            margin-bottom: 10px;
-            background: var(--white);
-            color: var(--black);
-            transition: border-color 0.2s;
-        }
-
-        button {
-            font-weight: 600;
-            background: var(--black);
-            color: var(--white);
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: var(--accent);
-        }
-
-        .loading {
-            font-size: 16px;
-            text-align: center;
-            margin-top: 40px;
-        }
-
-        /* Modal */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.7);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            visibility: hidden;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal-overlay.active {
-            visibility: visible;
-            opacity: 1;
-        }
-
-        .modal {
-            background: var(--white);
-            border-radius: var(--radius);
-            padding: 24px;
-            width: 90%;
-            max-width: 600px;
-            position: relative;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-header h2 {
-            font-family: var(--font-display);
-            font-size: 20px;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .modal-body p {
-            margin-bottom: 12px;
-            font-size: 14px;
-        }
-
-        .modal-footer {
-            margin-top: 20px;
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        @media (max-width: 768px) {
-            .model-grid {
-                grid-template-columns: 1fr;
-            }
-            .main {
-                padding: 20px;
-            }
-        }
-    </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="main">
-        <div class="topbar">
-            <div class="topbar-title">VDG Casting Panel</div>
+
+<div class="app">
+
+  <!-- AUTH SCREEN -->
+
+  <section id="auth-screen">
+
+    <div class="auth-card">
+
+      <h1>VDG Event Portal</h1>
+
+      <div class="auth-buttons">
+        <button id="show-signin">Sign In</button>
+        <button id="show-signup">Sign Up</button>
+      </div>
+
+      <!-- SIGN IN -->
+
+      <div id="signin-section" class="hidden">
+
+        <h2>Sign In</h2>
+
+        <select id="signin-role">
+          <option value="">Select Role</option>
+          <option value="MODEL">Model</option>
+          <option value="STYLIST">Stylist</option>
+          <option value="HAIR_STYLIST">Hair Stylist</option>
+          <option value="MAKEUP_ARTIST">Makeup Artist</option>
+          <option value="ADMIN">Admin</option>
+        </select>
+
+        <select id="signin-user"></select>
+
+        <input
+          type="password"
+          placeholder="4 Digit PIN"
+          id="signin-pin"
+        >
+
+        <button id="signin-btn">
+          Sign In
+        </button>
+
+      </div>
+
+      <!-- SIGN UP -->
+
+      <div id="signup-section" class="hidden">
+
+        <h2>Create Account</h2>
+
+        <select id="signup-role">
+          <option value="">I am a...</option>
+          <option value="MODEL">Model</option>
+          <option value="STYLIST">Stylist</option>
+          <option value="HAIR_STYLIST">Hair Stylist</option>
+          <option value="MAKEUP_ARTIST">Makeup Artist</option>
+          <option value="OTHER">Other</option>
+        </select>
+
+        <select id="signup-name"></select>
+
+        <input
+          type="password"
+          placeholder="Create 4 Digit PIN"
+          id="signup-pin"
+        >
+
+        <div id="model-upload-section" class="hidden">
+
+          <h3>Face Close Up Photos</h3>
+
+          <p>
+            Upload clear face photos for casting,
+            styling and beauty reference.
+          </p>
+
+          <input
+            type="file"
+            multiple
+            id="face-upload"
+          >
+
+          <h3>Hair Inspiration Photos</h3>
+
+          <p>
+            These will be used by the Hair Team.
+          </p>
+
+          <input
+            type="file"
+            multiple
+            id="hair-upload"
+          >
+
+          <textarea
+            id="hair-notes"
+            placeholder="Hair notes..."
+          ></textarea>
+
+          <h3>Makeup Inspiration Photos</h3>
+
+          <p>
+            These will be used by the Makeup Team.
+          </p>
+
+          <input
+            type="file"
+            multiple
+            id="makeup-upload"
+          >
+
+          <textarea
+            id="makeup-notes"
+            placeholder="Makeup notes..."
+          ></textarea>
+
+          <h3>Base Fit References</h3>
+
+          <p>
+            Upload all outfit references you want
+            your stylist to see.
+          </p>
+
+          <input
+            type="file"
+            multiple
+            id="fit-upload"
+          >
+
+          <textarea
+            id="styling-notes"
+            placeholder="Styling notes..."
+          ></textarea>
+
         </div>
 
-        <!-- Model Grid -->
-        <div class="model-grid" id="model-grid">
-            <!-- Example Model Card -->
-            <div class="model-card">
-                <div class="card-header">
-                    <div class="card-name">Emmanuel Siboniyo</div>
-                    <div class="card-handle">@emmanuelsiboniyo_</div>
-                </div>
-                <div class="card-body">
-                    <p><label>Gender:</label> Male</p>
-                    <p><label>Age:</label> 20</p>
-                    <p><label>Ethnicity:</label> African</p>
-                    <p><label>Height:</label> 5'7-5'9</p>
-                    <p><label>Suburb:</label> Acacia Ridge</p>
-                    <p><label>Followers:</label> 500-1.5k</p>
-                    <div class="assign-section">
-                        <label>Assign Stylist</label>
-                        <select>
-                            <option value="">Unassigned</option>
-                            <option value="Deon">Deon</option>
-                            <option value="Maria">Maria</option>
-                            <option value="Komi">Komi</option>
-                        </select>
-                        <label>Assign Hair Stylist</label>
-                        <select>
-                            <option value="">Unassigned</option>
-                            <option value="Christie">Christie</option>
-                            <option value="Neza">Neza</option>
-                            <option value="Rebecca">Rebecca</option>
-                        </select>
-                        <button onclick="approveModel(this)">Approve Model</button>
-                    </div>
-                </div>
-            </div>
-            <!-- Repeat model cards here dynamically with data -->
-            <!-- Example end -->
-        </div>
+        <button id="signup-btn">
+          Create Account
+        </button>
 
-        <!-- Modal -->
-        <div class="modal-overlay" id="model-modal">
-            <div class="modal">
-                <div class="modal-header">
-                    <h2 id="modal-name">Model Name</h2>
-                    <button class="modal-close" onclick="closeModal()">✕</button>
-                </div>
-                <div class="modal-body" id="modal-body">
-                    <!-- Details will be injected via JavaScript -->
-                </div>
-                <div class="modal-footer">
-                    <button onclick="closeModal()">Close</button>
-                </div>
-            </div>
-        </div>
+      </div>
 
-        <div class="loading" id="loading">Loading models...</div>
     </div>
 
-    <script>
-        // Example data — replace with your dynamic data
-        const models = [
-            {
-                name: "Emmanuel Siboniyo",
-                handle: "@emmanuelsiboniyo_",
-                gender: "Male",
-                age: 20,
-                ethnicity: "African",
-                height: "5'7-5'9",
-                suburb: "Acacia Ridge",
-                followers: "500-1.5k",
-            },
-            {
-                name: "Bright Merha",
-                handle: "@_brxghtmxrha",
-                gender: "Male",
-                age: 23,
-                ethnicity: "Ethiopian",
-                height: "6'0-6'2",
-                suburb: "West End",
-                followers: "2k-5k",
-            }
-            // Add more model objects here...
-        ];
+  </section>
 
-        function renderModels() {
-            const grid = document.getElementById('model-grid');
-            const loading = document.getElementById('loading');
-            loading.style.display = 'none';
+  <!-- ADMIN DASHBOARD -->
 
-            models.forEach(model => {
-                const card = document.createElement('div');
-                card.className = 'model-card';
-                card.innerHTML = `
-                    <div class="card-header">
-                        <div class="card-name">${model.name}</div>
-                        <div class="card-handle">${model.handle}</div>
-                    </div>
-                    <div class="card-body">
-                        <p><label>Gender:</label> ${model.gender}</p>
-                        <p><label>Age:</label> ${model.age}</p>
-                        <p><label>Ethnicity:</label> ${model.ethnicity}</p>
-                        <p><label>Height:</label> ${model.height}</p>
-                        <p><label>Suburb:</label> ${model.suburb}</p>
-                        <p><label>Followers:</label> ${model.followers}</p>
-                        <div class="assign-section">
-                            <label>Assign Stylist</label>
-                            <select>
-                                <option value="">Unassigned</option>
-                                <option value="Deon">Deon</option>
-                                <option value="Maria">Maria</option>
-                                <option value="Komi">Komi</option>
-                            </select>
-                            <label>Assign Hair Stylist</label>
-                            <select>
-                                <option value="">Unassigned</option>
-                                <option value="Christie">Christie</option>
-                                <option value="Neza">Neza</option>
-                                <option value="Rebecca">Rebecca</option>
-                            </select>
-                            <button onclick="approveModel(this)">Approve Model</button>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-        }
+  <section
+    id="admin-dashboard"
+    class="dashboard hidden"
+  >
 
-        function approveModel(button) {
-            button.textContent = 'Approved ✓';
-            button.style.background = 'var(--accent)';
-        }
+    <div class="topbar">
 
-        function closeModal() {
-            document.getElementById('model-modal').classList.remove('active');
-        }
+      <h1>Admin Dashboard</h1>
 
-        // Example if you want to open a modal for full profile
-        // function openModal(model) {
-        //     document.getElementById('modal-name').textContent = model.name;
-        //     document.getElementById('modal-body').innerHTML = `
-        //         <p><label>Gender:</label> ${model.gender}</p>
-        //         <p><label>Age:</label> ${model.age}</p>
-        //         <p><label>Ethnicity:</label> ${model.ethnicity}</p>
-        //         <p><label>Height:</label> ${model.height}</p>
-        //         <p><label>Suburb:</label> ${model.suburb}</p>
-        //         <p><label>Followers:</label> ${model.followers}</p>
-        //         <!-- Add more fields if needed -->
-        //     `;
-        //     document.getElementById('model-modal').classList.add('active');
-        // }
+      <button class="logout-btn">
+        Logout
+      </button>
 
-        // Render models after content loads
-        window.addEventListener('DOMContentLoaded', renderModels);
-    </script>
+    </div>
+
+    <div id="admin-model-grid"></div>
+
+  </section>
+
+  <!-- STYLIST DASHBOARD -->
+
+  <section
+    id="stylist-dashboard"
+    class="dashboard hidden"
+  >
+
+    <div class="topbar">
+
+      <h1>My Assigned Models</h1>
+
+      <button class="logout-btn">
+        Logout
+      </button>
+
+    </div>
+
+    <div id="stylist-models"></div>
+
+  </section>
+
+  <!-- HAIR DASHBOARD -->
+
+  <section
+    id="hair-dashboard"
+    class="dashboard hidden"
+  >
+
+    <div class="topbar">
+
+      <h1>Hair Team</h1>
+
+      <button class="logout-btn">
+        Logout
+      </button>
+
+    </div>
+
+    <div id="hair-models"></div>
+
+  </section>
+
+  <!-- MAKEUP DASHBOARD -->
+
+  <section
+    id="makeup-dashboard"
+    class="dashboard hidden"
+  >
+
+    <div class="topbar">
+
+      <h1>Makeup Team</h1>
+
+      <button class="logout-btn">
+        Logout
+      </button>
+
+    </div>
+
+    <div id="makeup-models"></div>
+
+  </section>
+
+  <!-- MODEL DASHBOARD -->
+
+  <section
+    id="model-dashboard"
+    class="dashboard hidden"
+  >
+
+    <div class="topbar">
+
+      <h1>My Profile</h1>
+
+      <button class="logout-btn">
+        Logout
+      </button>
+
+    </div>
+
+    <div id="model-profile"></div>
+
+  </section>
+
+</div>
+
+<script src="app.js"></script>
+
 </body>
 </html>
