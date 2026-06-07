@@ -345,23 +345,45 @@ async function loadAdminModels() {
 
         </div>
 
-        <div class="card-actions">
+      <div class="card-actions">
 
-          <button
-            onclick="approveModel('${model.id}')"
-            class="approve-btn"
-          >
-            Approve
-          </button>
+  <label>Stylist</label>
+  <select onchange="assignStylist('${model.id}', this.value)">
+    <option value="">Unassigned</option>
+    <option value="Daniel">Daniel</option>
+    <option value="Koami">Koami</option>
+    <option value="Dee">Dee</option>
+  </select>
 
-          <button
-            onclick="rejectModel('${model.id}')"
-            class="reject-btn"
-          >
-            Reject
-          </button>
+  <label>Hair</label>
+  <select onchange="assignHair('${model.id}', this.value)">
+    <option value="">Unassigned</option>
+    <option value="Neza">Neza</option>
+    <option value="Christie">Christie</option>
+    <option value="Marie">Marie</option>
+  </select>
 
-        </div>
+  <label>Makeup</label>
+  <select onchange="assignMakeup('${model.id}', this.value)">
+    <option value="">Unassigned</option>
+    <option value="Rebecca">Rebecca</option>
+  </select>
+
+  <button
+    onclick="approveModel('${model.id}')"
+    class="approve-btn"
+  >
+    Approve
+  </button>
+
+  <button
+    onclick="rejectModel('${model.id}')"
+    class="reject-btn"
+  >
+    Reject
+  </button>
+
+</div>
 
       </div>
     `;
@@ -399,7 +421,38 @@ window.rejectModel = async function(id) {
 };
 
 // ---------- LOGOUT ----------
+window.assignStylist = async function(id, stylist) {
 
+  await supabaseClient
+    .from("model_profiles")
+    .update({
+      assigned_stylist: stylist
+    })
+    .eq("id", id);
+
+};
+
+window.assignHair = async function(id, hair) {
+
+  await supabaseClient
+    .from("model_profiles")
+    .update({
+      assigned_hair: hair
+    })
+    .eq("id", id);
+
+};
+
+window.assignMakeup = async function(id, makeup) {
+
+  await supabaseClient
+    .from("model_profiles")
+    .update({
+      assigned_makeup: makeup
+    })
+    .eq("id", id);
+
+};
 function logout() {
 
   currentUser = null;
