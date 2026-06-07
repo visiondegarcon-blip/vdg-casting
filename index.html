@@ -10,7 +10,7 @@
 <style>
 /* ============================================================
    TOKENS & RESET
-============================================================ */
+// ===================================================
 :root {
   --black:    #0c0c0c;
   --off:      #ffffff;
@@ -60,7 +60,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    AUTH SCREEN
-============================================================ */
+// ===================================================
 #auth-screen {
   min-height: 100vh;
   display: flex;
@@ -169,7 +169,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    APP SHELL
-============================================================ */
+// ===================================================
 #app { display: flex; min-height: 100vh; }
 
 /* Sidebar */
@@ -272,7 +272,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    STATS ROW
-============================================================ */
+// ===================================================
 .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; margin-bottom: 36px; background: var(--border); border: 1px solid var(--border); }
 .stat-card {
   background: var(--white);
@@ -283,7 +283,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    FILTERS
-============================================================ */
+// ===================================================
 .filter-bar {
   display: flex;
   gap: 10px;
@@ -310,7 +310,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    MODEL GRID
-============================================================ */
+// ===================================================
 .model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1px; background: var(--border); }
 .model-card {
   background: var(--white);
@@ -440,7 +440,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    MODEL DETAIL MODAL
-============================================================ */
+// ===================================================
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -544,7 +544,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    INVENTORY PAGE
-============================================================ */
+// ===================================================
 .inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1px; background: var(--border); }
 .inv-card {
   background: var(--white);
@@ -569,7 +569,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    MODEL SELF-VIEW
-============================================================ */
+// ===================================================
 .model-profile-card {
   max-width: 600px;
   margin: 0 auto;
@@ -607,7 +607,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    ROSTER PAGE
-============================================================ */
+// ===================================================
 .roster-card {
   background: var(--white);
   border-bottom: 1px solid var(--border);
@@ -638,7 +638,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    TOAST
-============================================================ */
+// ===================================================
 #toast {
   position: fixed;
   bottom: 24px;
@@ -661,7 +661,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    MOBILE MENU
-============================================================ */
+// ===================================================
 .mob-topbar {
   display: none;
   padding: 14px 20px;
@@ -684,7 +684,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 /* ============================================================
    RESPONSIVE
-============================================================ */
+// ===================================================
 @media (max-width: 768px) {
   .sidebar { transform: translateX(-100%); }
   .sidebar.open { transform: translateX(0); }
@@ -727,12 +727,12 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 <!-- ============================================================
      TOAST
-============================================================ -->
+// ===================================================
 <div id="toast"></div>
 
 <!-- ============================================================
      AUTH SCREEN
-============================================================ -->
+// ===================================================
 <div id="auth-screen">
   <div class="auth-card">
     <div class="auth-logo">VDG</div>
@@ -809,7 +809,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 <!-- ============================================================
      MAIN APP
-============================================================ -->
+// ===================================================
 <div id="app" class="hidden">
 
   <!-- Mobile topbar -->
@@ -851,7 +851,7 @@ label { font-size: 11px; color: var(--text-dim); letter-spacing: .08em; text-tra
 
 <!-- ============================================================
      MODEL DETAIL MODAL
-============================================================ -->
+// ===================================================
 <div class="modal-overlay hidden" id="model-modal" onclick="closeModalOnOverlay(event)">
   <div class="modal" id="modal-inner">
     <div class="modal-header">
@@ -915,7 +915,7 @@ const STAFF = {
 
 // ============================================================
 // STATE
-============================================================ */
+// ===================================================
 let currentUser = null;
 let currentRole = null; // 'admin' | 'staff' | 'model'
 let currentPage = null;
@@ -924,7 +924,7 @@ let inventoryData = [];
 
 // ============================================================
 // INIT
-============================================================ */
+// ===================================================
 window.addEventListener('DOMContentLoaded', async () => {
   populateModelDropdown();
   const { data: { session } } = await sb.auth.getSession();
@@ -979,7 +979,7 @@ function defaultPage() {
 
 // ============================================================
 // SUPABASE DATA
-============================================================ */
+// ===================================================
 async function fetchModelData() {
   const { data, error } = await sb.from('model_profiles').select('*');
   if (data) {
@@ -1008,7 +1008,7 @@ async function upsertInventoryItem(item) {
 
 // ============================================================
 // NAVIGATION
-============================================================ */
+// ===================================================
 function buildNav() {
   const nav = document.getElementById('sidebar-nav');
   nav.innerHTML = '';
@@ -1061,7 +1061,7 @@ function navigateTo(page) {
 
 // ============================================================
 // DASHBOARD
-============================================================ */
+// ===================================================
 function renderDashboard(el) {
   const total = MODEL_ROSTER.length;
   const approved = Object.values(modelData).filter(m => m.approved).length;
@@ -1101,7 +1101,7 @@ function renderDashboard(el) {
 
 // ============================================================
 // MODELS PAGE
-============================================================ */
+// ===================================================
 let filterGender = '';
 let filterEthnicity = '';
 let filterStatus = '';
@@ -1214,7 +1214,7 @@ function modelCard(m) {
 
 // ============================================================
 // APPROVE & ASSIGN
-============================================================ */
+// ===================================================
 async function toggleApprove(name) {
   const db = modelData[name] || {};
   const newVal = !db.approved;
@@ -1235,7 +1235,7 @@ async function assignStaff(name, field, value) {
 
 // ============================================================
 // MODEL DETAIL MODAL
-============================================================ */
+// ===================================================
 function openModal(name) {
   const m = MODEL_ROSTER.find(x => x.name === name);
   if (!m) return;
@@ -1385,7 +1385,7 @@ async function saveNotes(name) {
 
 // ============================================================
 // INVENTORY PAGE
-============================================================ */
+// ===================================================
 async function renderInventory(el) {
   el.innerHTML = `<div class="loading-screen"><div class="loader"></div></div>`;
   await fetchInventory();
@@ -1463,7 +1463,7 @@ async function saveInventoryItem() {
 
 // ============================================================
 // MODEL SELF VIEW
-============================================================ */
+// ===================================================
 function renderMyProfile(el) {
   const meta = currentUser?.user_metadata || {};
   const name = meta.display_name || '';
@@ -1583,7 +1583,7 @@ async function handleUpload(input, type, modelName) {
 
 // ============================================================
 // ROSTER (models see limited view of other models)
-============================================================ */
+// ===================================================
 function renderRoster(el) {
   el.innerHTML = `
     <p style="font-size:13px;color:var(--text-dim);margin-bottom:20px">Your fellow models for the Brisbane Runway show — Jul 5, 2026.</p>
@@ -1606,7 +1606,7 @@ function renderRoster(el) {
 
 // ============================================================
 // AUTH
-============================================================ */
+// ===================================================
 function showAuthTab(tab) {
   document.getElementById('tab-signin').classList.toggle('hidden', tab !== 'signin');
   document.getElementById('tab-signup').classList.toggle('hidden', tab !== 'signup');
@@ -1682,7 +1682,7 @@ function showAuthScreen() {
 
 // ============================================================
 // MOBILE SIDEBAR
-============================================================ */
+// ===================================================
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('open');
   document.getElementById('sidebar-overlay').classList.toggle('open');
@@ -1690,7 +1690,7 @@ function toggleSidebar() {
 
 // ============================================================
 // TOAST
-============================================================ */
+// ===================================================
 let toastTimer;
 function toast(msg, isError=false) {
   const el = document.getElementById('toast');
