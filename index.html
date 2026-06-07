@@ -1,271 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VDG Event Portal</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="styles.css">
+  <title>VDG — Casting Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-
 <div class="app">
 
-  <!-- AUTH SCREEN -->
-
+  <!-- ═══════════════════════════════════════
+       AUTH
+  ═══════════════════════════════════════ -->
   <section id="auth-screen">
+    <div class="auth-wrap">
+      <div class="auth-bg-text">VDG</div>
+      <div class="auth-card">
+        <div class="auth-logo">VDG</div>
+        <div class="auth-sub">Casting Portal — Brisbane 05.07.26</div>
 
-    <div class="auth-card">
-
-      <h1>VDG Event Portal</h1>
-
-      <div class="auth-buttons">
-        <button id="show-signin">Sign In</button>
-        <button id="show-signup">Sign Up</button>
-      </div>
-
-      <!-- SIGN IN -->
-
-      <div id="signin-section" class="hidden">
-
-        <h2>Sign In</h2>
-
-        <select id="signin-role">
-          <option value="">Select Role</option>
-          <option value="MODEL">Model</option>
-          <option value="STYLIST">Stylist</option>
-          <option value="HAIR_STYLIST">Hair Stylist</option>
-          <option value="MAKEUP_ARTIST">Makeup Artist</option>
-          <option value="ADMIN">Admin</option>
-        </select>
-
-        <select id="signin-user"></select>
-
-        <input
-          type="password"
-          placeholder="4 Digit PIN"
-          id="signin-pin"
-        >
-
-        <button id="signin-btn">
-          Sign In
-        </button>
-
-      </div>
-
-      <!-- SIGN UP -->
-
-      <div id="signup-section" class="hidden">
-
-        <h2>Create Account</h2>
-
-        <select id="signup-role">
-          <option value="">I am a...</option>
-          <option value="MODEL">Model</option>
-          <option value="STYLIST">Stylist</option>
-          <option value="HAIR_STYLIST">Hair Stylist</option>
-          <option value="MAKEUP_ARTIST">Makeup Artist</option>
-          <option value="OTHER">Other</option>
-        </select>
-
-        <select id="signup-name"></select>
-
-        <input
-          type="password"
-          placeholder="Create 4 Digit PIN"
-          id="signup-pin"
-        >
-
-        <div id="model-upload-section" class="hidden">
-
-          <h3>Face Close Up Photos</h3>
-
-          <p>
-            Upload clear face photos for casting,
-            styling and beauty reference.
-          </p>
-
-          <input
-            type="file"
-            multiple
-            id="face-upload"
-          >
-
-          <h3>Hair Inspiration Photos</h3>
-
-          <p>
-            These will be used by the Hair Team.
-          </p>
-
-          <input
-            type="file"
-            multiple
-            id="hair-upload"
-          >
-
-          <textarea
-            id="hair-notes"
-            placeholder="Hair notes..."
-          ></textarea>
-
-          <h3>Makeup Inspiration Photos</h3>
-
-          <p>
-            These will be used by the Makeup Team.
-          </p>
-
-          <input
-            type="file"
-            multiple
-            id="makeup-upload"
-          >
-
-          <textarea
-            id="makeup-notes"
-            placeholder="Makeup notes..."
-          ></textarea>
-
-          <h3>Base Fit References</h3>
-
-          <p>
-            Upload all outfit references you want
-            your stylist to see.
-          </p>
-
-          <input
-            type="file"
-            multiple
-            id="fit-upload"
-          >
-
-          <textarea
-            id="styling-notes"
-            placeholder="Styling notes..."
-          ></textarea>
-
+        <div class="auth-tabs">
+          <button class="auth-tab active" id="tab-signin-btn" onclick="showTab('signin')">Sign In</button>
+          <button class="auth-tab" id="tab-signup-btn" onclick="showTab('signup')">Sign Up</button>
         </div>
 
-        <button id="signup-btn">
-          Create Account
-        </button>
+        <!-- SIGN IN -->
+        <div id="signin-section">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="signin-username" placeholder="your.username" autocapitalize="none"/>
+          </div>
+          <div class="form-group">
+            <label>PIN</label>
+            <input type="password" id="signin-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric"/>
+          </div>
+          <button class="btn" id="signin-btn">Sign In</button>
+          <div class="error-msg" id="signin-error"></div>
+        </div>
 
+        <!-- SIGN UP -->
+        <div id="signup-section" class="hidden">
+          <div class="form-group">
+            <label>I am a...</label>
+            <select id="signup-role" onchange="loadSignupNames()">
+              <option value="">Select role</option>
+              <option value="MODEL">Model / Applicant</option>
+              <option value="STYLIST">Stylist</option>
+              <option value="HAIR_STYLIST">Hair Stylist</option>
+              <option value="MAKEUP_ARTIST">Makeup Artist</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="signup-name-group">
+            <label>Select Your Name</label>
+            <select id="signup-name">
+              <option value="">— choose your name —</option>
+            </select>
+          </div>
+          <div class="form-group hidden" id="signup-credentials-group">
+            <label>Choose a Username</label>
+            <input type="text" id="signup-username" placeholder="e.g. jordan.sullivan" autocapitalize="none"/>
+            <label style="margin-top:12px">Create a 4-Digit PIN</label>
+            <input type="password" id="signup-pin" placeholder="e.g. 1234" maxlength="4" inputmode="numeric"/>
+          </div>
+          <button class="btn hidden" id="signup-btn">Create Account</button>
+          <div class="error-msg" id="signup-error"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       ADMIN DASHBOARD
+  ═══════════════════════════════════════ -->
+  <section id="admin-dashboard" class="dashboard hidden">
+    <div class="sidebar">
+      <div class="sidebar-logo">VDG</div>
+      <div class="sidebar-event">Brisbane — Jul 5</div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="adminNav('models', this)">
+          <span class="nav-icon">◉</span> All Models
+        </button>
+        <button class="nav-item" onclick="adminNav('inventory', this)">
+          <span class="nav-icon">◫</span> Inventory
+        </button>
+        <button class="nav-item" onclick="adminNav('team', this)">
+          <span class="nav-icon">◈</span> Team
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user-name" id="admin-username-display">—</div>
+        <div class="sidebar-user-role">Admin</div>
+        <button class="signout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+    <main class="main-content">
+      <div class="topbar">
+        <div class="topbar-title" id="admin-page-title">All Models</div>
+        <div class="topbar-actions">
+          <input type="text" class="search-input" placeholder="Search models…" oninput="filterModels(this.value)" id="model-search"/>
+        </div>
       </div>
 
-    </div>
+      <!-- Models Panel -->
+      <div id="admin-models-panel" class="panel-content">
+        <div class="filter-row" id="admin-filter-row">
+          <button class="chip active" onclick="setChip(this,'all')">All</button>
+          <button class="chip" onclick="setChip(this,'approved')">Approved</button>
+          <button class="chip" onclick="setChip(this,'pending')">Pending</button>
+          <button class="chip" onclick="setChip(this,'cultural')">Has Cultural</button>
+          <button class="chip" onclick="setChip(this,'talent')">Has Talent</button>
+          <button class="chip" onclick="setChip(this,'busy')">⚠ Busy AM</button>
+        </div>
+        <div class="model-grid" id="admin-model-grid"></div>
+      </div>
 
+      <!-- Inventory Panel -->
+      <div id="admin-inventory-panel" class="panel-content hidden">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
+          <span class="dim-text" id="inv-count">0 items</span>
+          <button class="btn btn-sm" onclick="openInvModal()">+ Add Item</button>
+        </div>
+        <div class="inv-grid" id="inv-grid"></div>
+      </div>
+
+      <!-- Team Panel -->
+      <div id="admin-team-panel" class="panel-content hidden">
+        <div class="team-grid" id="team-grid"></div>
+      </div>
+    </main>
   </section>
 
-  <!-- ADMIN DASHBOARD -->
-
-  <section
-    id="admin-dashboard"
-    class="dashboard hidden"
-  >
-
-    <div class="topbar">
-
-      <h1>Admin Dashboard</h1>
-
-      <button class="logout-btn">
-        Logout
-      </button>
-
+  <!-- ═══════════════════════════════════════
+       STAFF DASHBOARD (stylist / hair / mua)
+  ═══════════════════════════════════════ -->
+  <section id="staff-dashboard" class="dashboard hidden">
+    <div class="sidebar">
+      <div class="sidebar-logo">VDG</div>
+      <div class="sidebar-event">Brisbane — Jul 5</div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="staffNav('all', this)">
+          <span class="nav-icon">◉</span> All Models
+        </button>
+        <button class="nav-item" onclick="staffNav('mine', this)">
+          <span class="nav-icon">◎</span> My Models
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user-name" id="staff-username-display">—</div>
+        <div class="sidebar-user-role" id="staff-role-display">Staff</div>
+        <button class="signout-btn" onclick="logout()">Sign Out</button>
+      </div>
     </div>
-
-    <div id="admin-model-grid"></div>
-
+    <main class="main-content">
+      <div class="topbar">
+        <div class="topbar-title" id="staff-page-title">All Models</div>
+        <div class="topbar-actions">
+          <input type="text" class="search-input" placeholder="Search models…" oninput="filterStaffModels(this.value)"/>
+        </div>
+      </div>
+      <div class="panel-content">
+        <div class="model-grid" id="staff-model-grid"></div>
+      </div>
+    </main>
   </section>
 
-  <!-- STYLIST DASHBOARD -->
-
-  <section
-    id="stylist-dashboard"
-    class="dashboard hidden"
-  >
-
-    <div class="topbar">
-
-      <h1>My Assigned Models</h1>
-
-      <button class="logout-btn">
-        Logout
-      </button>
-
+  <!-- ═══════════════════════════════════════
+       MODEL DASHBOARD
+  ═══════════════════════════════════════ -->
+  <section id="model-dashboard" class="dashboard hidden">
+    <div class="mob-topbar">
+      <div class="mob-logo">VDG</div>
+      <button class="signout-btn" onclick="logout()">Out</button>
     </div>
-
-    <div id="stylist-models"></div>
-
+    <div class="model-profile-wrap" id="model-profile-wrap"></div>
   </section>
 
-  <!-- HAIR DASHBOARD -->
-
-  <section
-    id="hair-dashboard"
-    class="dashboard hidden"
-  >
-
-    <div class="topbar">
-
-      <h1>Hair Team</h1>
-
-      <button class="logout-btn">
-        Logout
-      </button>
-
+  <!-- ═══════════════════════════════════════
+       MODEL DETAIL PANEL (slide-in)
+  ═══════════════════════════════════════ -->
+  <div class="panel-overlay hidden" id="model-panel-overlay" onclick="closeModelPanel(event)">
+    <div class="model-panel" id="model-panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-name" id="panel-name"></div>
+          <div class="panel-handle" id="panel-handle"></div>
+        </div>
+        <button class="panel-close" onclick="closePanel()">✕</button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
     </div>
+  </div>
 
-    <div id="hair-models"></div>
-
-  </section>
-
-  <!-- MAKEUP DASHBOARD -->
-
-  <section
-    id="makeup-dashboard"
-    class="dashboard hidden"
-  >
-
-    <div class="topbar">
-
-      <h1>Makeup Team</h1>
-
-      <button class="logout-btn">
-        Logout
-      </button>
-
+  <!-- ═══════════════════════════════════════
+       INVENTORY MODAL
+  ═══════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="inv-modal-overlay" onclick="closeInvModal(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <span style="font-family:var(--font-display);font-size:22px;font-weight:400;letter-spacing:.04em">Add Inventory Item</span>
+        <button class="panel-close" onclick="document.getElementById('inv-modal-overlay').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group"><label>Item Name</label><input id="inv-name" placeholder="e.g. Cream oversized blazer"/></div>
+        <div class="form-group"><label>Category</label>
+          <select id="inv-cat">
+            <option value="Top">Top</option>
+            <option value="Bottom">Bottom</option>
+            <option value="Outerwear">Outerwear</option>
+            <option value="Accessory">Accessory</option>
+            <option value="Shoes">Shoes</option>
+            <option value="Full Look">Full Look</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Size / Qty</label><input id="inv-size" placeholder="e.g. S/M, one size, x3"/></div>
+        <div class="form-group"><label>Assign to Model</label>
+          <select id="inv-model-assign"><option value="">Unassigned</option></select>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea id="inv-notes" placeholder="Colour, condition, notes…"></textarea></div>
+        <button class="btn" onclick="saveInvItem()">Save Item</button>
+      </div>
     </div>
+  </div>
 
-    <div id="makeup-models"></div>
-
-  </section>
-
-  <!-- MODEL DASHBOARD -->
-
-  <section
-    id="model-dashboard"
-    class="dashboard hidden"
-  >
-
-    <div class="topbar">
-
-      <h1>My Profile</h1>
-
-      <button class="logout-btn">
-        Logout
-      </button>
-
-    </div>
-
-    <div id="model-profile"></div>
-
-  </section>
+  <!-- TOAST -->
+  <div id="toast"></div>
 
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="app.js"></script>
-
 </body>
 </html>
