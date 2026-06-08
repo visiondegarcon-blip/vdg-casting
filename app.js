@@ -488,6 +488,11 @@ function modelCardHTML(m, viewerRole) {
     if (taken) statusPill = `<span class="badge badge-brown">Taken by ${taken}</span>`;
   }
 
+  // Assignment tags — shown to staff so they can see at a glance who's already on a model
+  const assignedTags = [m.assigned_stylist, m.assigned_hair, m.assigned_makeup]
+    .filter((v,i,a)=>v && a.indexOf(v)===i)
+    .map(name=>`<span class="badge badge-brown">Assigned to ${name}</span>`).join('');
+
   const adminFooter = isAdmin ? `
     <div class="card-footer">
       <select class="assign-select" onchange="assignField('${m.id}','assigned_stylist',this.value);event.stopPropagation()">
@@ -527,8 +532,10 @@ function modelCardHTML(m, viewerRole) {
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
         ${m.ethnicity?`<span class="badge badge-outline">${m.ethnicity}</span>`:''}
-        ${m.talent?'<span class="badge badge-blue">🎤 Talent</span>':''}
-        ${!m.free_5july?'<span class="badge badge-red">⚠ Busy AM</span>':''}
+        ${isAdmin ? `
+          ${m.talent?'<span class="badge badge-blue">🎤 Talent</span>':''}
+          ${!m.free_5july?'<span class="badge badge-red">⚠ Busy AM</span>':''}
+        ` : assignedTags}
         ${statusPill}
       </div>
       <div class="card-details">
@@ -563,6 +570,16 @@ async function assignField(id, field, value) {
   const m = allModels.find(x=>String(x.id)===String(id));
   if (m) m[field]=value;
   toast('Saved');
+}
+async function assignInventoryToModel(itemId, modelName, panelModelId) {
+  const { error } = await sb.from('inventory').update({ assigned_model: modelName }).eq('id', itemId);
+  if (error) { toast(error.message, true); return; }
+  const item = inventoryData.find(x=>String(x.id)===String(itemId));
+  if (item) item.assigned_model = modelName;
+  toast(modelName ? `Added to ${modelName.split(' ')[0]}'s stage fit` : 'Removed from stage fit');
+  if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+  if (panelModelId) await openModelPanel(panelModelId);
 }
 async function toggleApprove(id) {
   const m = allModels.find(x=>String(x.id)===String(id));
@@ -637,6 +654,32 @@ async function openModelPanel(id) {
           <button class="status-btn${workingCls}" onclick="setStatus('${m.id}','working')">✓ Work With</button>
           ${rf.hasPending?`<button class="status-btn${pendingCls}" onclick="setStatus('${m.id}','pending')">◷ Pending</button>`:''}
           <button class="status-btn${rejectCls}" onclick="setStatus('${m.id}','rejected')">✕ Reject</button>
+        </div>
+      </div>`;
+  }
+
+  // ── Stage Fit picker (admin + staff): assign inventory items to this model ──
+  let stageFitPicker = '';
+  if (role && role !== 'MODEL') {
+    const safeName = (m.full_name||'').replace(/'/g,"\\'");
+    const pickRows = inventoryData.length ? inventoryData.map(item=>{
+      const here = item.assigned_model === m.full_name;
+      const elsewhere = item.assigned_model && !here;
+      const safeAssign = here ? '' : safeName;
+      return `<div class="stage-fit-pick-row">
+        <div class="stage-fit-pick-info">
+          <div class="stage-fit-pick-name">${item.name||item.category||'Unnamed'}</div>
+          <div class="stage-fit-pick-meta">${item.category||''}${item.size_qty?' · '+item.size_qty:''}${elsewhere?` · taken by ${item.assigned_model}`:''}</div>
+        </div>
+        <button class="btn btn-sm ${here?'btn-brown':'btn-ghost'}" style="width:auto" onclick="event.stopPropagation();assignInventoryToModel('${item.id}','${safeAssign}','${m.id}')">${here?'✓ Added':'+ Add'}</button>
+      </div>`;
+    }).join('') : '<div class="no-photos">No inventory items yet</div>';
+    stageFitPicker = `
+      <div class="collapse-section">
+        <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Add to Stage Fit <span class="collapse-arrow">▾</span></button>
+        <div class="collapse-body">
+          <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 10px">Tap an item to add it to ${(m.full_name||'this model').split(' ')[0]}'s stage fit — it'll mark the item as taken and other staff will see it's assigned.</p>
+          <div class="stage-fit-pick-list">${pickRows}</div>
         </div>
       </div>`;
   }
@@ -745,6 +788,7 @@ async function openModelPanel(id) {
   // ── ORDER per role — photo buttons ALWAYS first ──
   let body = '';
   if (statusHTML) body += statusHTML;
+  if (stageFitPicker) body += stageFitPicker;
 
   if (role === 'HAIR_STYLIST') {
     body += hairMuaSection + faceSection + outfitSection + noteBlock + detailsBlock;
