@@ -57,6 +57,7 @@ let activeTab     = 'all';
 let staffTab      = 'all';
 let openModelData = null;
 let isNewModel    = false;
+let isNewStaff    = false;
 
 // ═══════════════════════════════════════════════
 // AUTH TABS
@@ -141,10 +142,21 @@ async function loadSignupNames() {
   staffFlow.classList.remove('hidden');
   credGroup.classList.remove('hidden');
   btn.classList.remove('hidden');
-  const names = role === 'ADMIN' ? STAFF_NAMES.ADMIN : (STAFF_NAMES[role]||[]);
+  const names = STAFF_NAMES[role]||[];
   const staffSel = document.getElementById('signup-name-staff');
   staffSel.innerHTML = '<option value="">— choose your name —</option>';
   names.forEach(n => { staffSel.innerHTML += `<option value="${n}">${n}</option>`; });
+  isNewStaff = false;
+  document.getElementById('new-staff-section').classList.add('hidden');
+  document.getElementById('existing-staff-section').classList.remove('hidden');
+  document.getElementById('signup-name-staff-new').value = '';
+  const toggle = document.querySelector('#staff-signup-flow .new-model-toggle');
+  if (toggle) {
+    toggle.style.cssText='';
+    toggle.querySelector('.new-model-toggle-text').style.color='';
+    toggle.querySelector('.new-model-toggle-sub').style.color='';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✨';
+  }
 }
 
 function toggleNewModel() {
@@ -153,6 +165,24 @@ function toggleNewModel() {
   document.getElementById('existing-model-section').classList.toggle('hidden', isNewModel);
   const toggle = document.querySelector('.new-model-toggle');
   if (isNewModel) {
+    toggle.style.background='var(--brown)'; toggle.style.borderColor='var(--brown)';
+    toggle.querySelector('.new-model-toggle-text').style.color='white';
+    toggle.querySelector('.new-model-toggle-sub').style.color='rgba(255,255,255,.7)';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✓';
+  } else {
+    toggle.style.cssText='';
+    toggle.querySelector('.new-model-toggle-text').style.color='';
+    toggle.querySelector('.new-model-toggle-sub').style.color='';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✨';
+  }
+}
+
+function toggleNewStaff() {
+  isNewStaff = !isNewStaff;
+  document.getElementById('new-staff-section').classList.toggle('hidden', !isNewStaff);
+  document.getElementById('existing-staff-section').classList.toggle('hidden', isNewStaff);
+  const toggle = document.querySelector('#staff-signup-flow .new-model-toggle');
+  if (isNewStaff) {
     toggle.style.background='var(--brown)'; toggle.style.borderColor='var(--brown)';
     toggle.querySelector('.new-model-toggle-text').style.color='white';
     toggle.querySelector('.new-model-toggle-sub').style.color='rgba(255,255,255,.7)';
@@ -207,8 +237,10 @@ async function signUp() {
       else            { await signUpExistingModel(username, pin); }
       return;
     }
-    const nameVal = document.getElementById('signup-name-staff').value;
-    if (!nameVal) { showError('signup-error','Select your name.'); return; }
+    const nameVal = isNewStaff
+      ? document.getElementById('signup-name-staff-new').value.trim()
+      : document.getElementById('signup-name-staff').value;
+    if (!nameVal) { showError('signup-error', isNewStaff ? 'Enter your name.' : 'Select your name.'); return; }
     const instagram = document.getElementById('signup-staff-instagram').value.trim().replace(/^@/,'');
     const { data:ex } = await sb.from('users').select('id').eq('username',username).maybeSingle();
     if (ex) { showError('signup-error','Username already taken.'); return; }
