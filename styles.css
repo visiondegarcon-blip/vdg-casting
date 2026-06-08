@@ -450,6 +450,7 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   border-radius: var(--radius-sm);
   overflow: hidden;
   margin-bottom: 10px;
+  flex-shrink: 0;
 }
 .collapse-btn {
   width: 100%;
