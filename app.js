@@ -488,10 +488,14 @@ function modelCardHTML(m, viewerRole) {
     if (taken) statusPill = `<span class="badge badge-brown">Taken by ${taken}</span>`;
   }
 
-  // Assignment tags — shown to staff so they can see at a glance who's already on a model
+  // Assignment tags — shown so staff can see at a glance who's already on a model
   const assignedTags = [m.assigned_stylist, m.assigned_hair, m.assigned_makeup]
     .filter((v,i,a)=>v && a.indexOf(v)===i)
     .map(name=>`<span class="badge badge-brown">Assigned to ${name}</span>`).join('');
+
+  const genderBadge = m.gender ? `<span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender}</span>` : '';
+  const igBadge     = m.instagram ? `<span class="badge badge-outline">@${m.instagram}</span>` : '';
+  const ethBadge    = m.ethnicity ? `<span class="badge badge-outline">${flag} ${m.ethnicity}</span>` : '';
 
   const adminFooter = isAdmin ? `
     <div class="card-footer">
@@ -527,15 +531,13 @@ function modelCardHTML(m, viewerRole) {
         </div>
         <div class="card-badges">
           ${isAdmin?`<span class="badge ${m.approved?'badge-brown':'badge-outline'}">${m.approved?'✓':'Pending'}</span>`:''}
-          <span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender||'—'}</span>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-        ${m.ethnicity?`<span class="badge badge-outline">${m.ethnicity}</span>`:''}
-        ${isAdmin ? `
-          ${m.talent?'<span class="badge badge-blue">🎤 Talent</span>':''}
-          ${!m.free_5july?'<span class="badge badge-red">⚠ Busy AM</span>':''}
-        ` : assignedTags}
+        ${genderBadge}
+        ${igBadge}
+        ${ethBadge}
+        ${assignedTags}
         ${statusPill}
       </div>
       <div class="card-details">
@@ -658,10 +660,11 @@ async function openModelPanel(id) {
       </div>`;
   }
 
-  // ── Stage Fit picker (admin + staff): assign inventory items to this model ──
-  let stageFitPicker = '';
+  // ── Stage Fit (admin + staff): everything assigned to this model + picker to add more ──
+  let stageFitSection = '';
   if (role && role !== 'MODEL') {
     const safeName = (m.full_name||'').replace(/'/g,"\\'");
+    const assignedGrid = modelInv.length ? `<div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div>` : '<div class="no-photos">Nothing assigned yet</div>';
     const pickRows = inventoryData.length ? inventoryData.map(item=>{
       const here = item.assigned_model === m.full_name;
       const elsewhere = item.assigned_model && !here;
@@ -674,11 +677,15 @@ async function openModelPanel(id) {
         <button class="btn btn-sm ${here?'btn-brown':'btn-ghost'}" style="width:auto" onclick="event.stopPropagation();assignInventoryToModel('${item.id}','${safeAssign}','${m.id}')">${here?'✓ Added':'+ Add'}</button>
       </div>`;
     }).join('') : '<div class="no-photos">No inventory items yet</div>';
-    stageFitPicker = `
+    stageFitSection = `
       <div class="collapse-section">
-        <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Add to Stage Fit <span class="collapse-arrow">▾</span></button>
+        <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Stage Fit <span class="collapse-arrow">▾</span></button>
         <div class="collapse-body">
-          <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 10px">Tap an item to add it to ${(m.full_name||'this model').split(' ')[0]}'s stage fit — it'll mark the item as taken and other staff will see it's assigned.</p>
+          <div class="panel-section-title" style="margin-top:4px">Assigned to ${(m.full_name||'this model').split(' ')[0]}</div>
+          <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 12px">Everything currently in their stage fit — including pieces they uploaded themselves and items staff have assigned.</p>
+          ${assignedGrid}
+          <div class="panel-section-title" style="margin-top:18px">Add From Inventory</div>
+          <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 10px">Tap an item to add it — it'll mark the item as taken and other staff will see it's assigned.</p>
           <div class="stage-fit-pick-list">${pickRows}</div>
         </div>
       </div>`;
@@ -703,15 +710,13 @@ async function openModelPanel(id) {
       </div>
     </div>`;
 
-  // Outfit = assigned inventory + model's own fit photos + outfit photos
-  const invHTML = modelInv.length ? `<div class="panel-section-title" style="margin-top:4px">Assigned Inventory</div><p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 12px">Wardrobe items from inventory assigned to this model for the shoot.</p><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div>` : '';
+  // Outfit = model's own fit photos + outfit photos (assigned inventory now lives in Stage Fit)
   const ownFits = [...photos, ...outfitPh];
   const outfitSection = `
     <div class="collapse-section">
       <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Outfit <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
-        ${invHTML}
-        <div class="panel-section-title" style="margin-top:${invHTML?'16px':'4px'}">Model's Own Fits</div>${photoGrid(ownFits)}
+        <div class="panel-section-title" style="margin-top:4px">Model's Own Fits</div>${photoGrid(ownFits)}
       </div>
     </div>`;
 
@@ -788,7 +793,7 @@ async function openModelPanel(id) {
   // ── ORDER per role — photo buttons ALWAYS first ──
   let body = '';
   if (statusHTML) body += statusHTML;
-  if (stageFitPicker) body += stageFitPicker;
+  if (stageFitSection) body += stageFitSection;
 
   if (role === 'HAIR_STYLIST') {
     body += hairMuaSection + faceSection + outfitSection + noteBlock + detailsBlock;
