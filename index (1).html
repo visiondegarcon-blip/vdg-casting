@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>VDG — Casting Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="app">
+
+  <!-- AUTH -->
+  <section id="auth-screen">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <img src="https://cdn.shopify.com/s/files/1/0671/0316/2542/files/B159ADF6-2CD6-45D8-9C17-133C8C94CA63.png?v=1780816525" alt="VDG" style="width:100px;display:block;margin-bottom:10px"/>
+        <div class="auth-sub">Casting Portal — Brisbane 05.07.26</div>
+        <div class="auth-tabs">
+          <button class="auth-tab active" onclick="showTab('signin')">Sign In</button>
+          <button class="auth-tab" onclick="showTab('signup')">Sign Up</button>
+        </div>
+
+        <!-- SIGN IN -->
+        <div id="signin-section">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="signin-username" placeholder="your.username" autocapitalize="none" autocorrect="off"/>
+          </div>
+          <div class="form-group">
+            <label>PIN</label>
+            <input type="password" id="signin-pin" placeholder="4-digit PIN" maxlength="4" inputmode="numeric"/>
+          </div>
+          <button class="btn" onclick="signIn()">Sign In</button>
+          <div class="error-msg" id="signin-error"></div>
+        </div>
+
+        <!-- SIGN UP -->
+        <div id="signup-section" class="hidden">
+          <div class="form-group">
+            <label>I am a...</label>
+            <div class="select-wrap">
+              <select id="signup-role" onchange="loadSignupNames()">
+                <option value="">Select role</option>
+                <option value="MODEL">Model / Applicant</option>
+                <option value="STYLIST">Stylist</option>
+                <option value="HAIR_STYLIST">Hair Stylist</option>
+                <option value="MAKEUP_ARTIST">Makeup Artist</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- MODEL FLOW -->
+          <div id="model-signup-flow" class="hidden">
+            <!-- New model button -->
+            <div class="new-model-toggle" onclick="toggleNewModel()">
+              <div class="new-model-toggle-icon">✨</div>
+              <div>
+                <div class="new-model-toggle-text">I'm a new model</div>
+                <div class="new-model-toggle-sub">Fill in your details fresh</div>
+              </div>
+            </div>
+
+            <div class="divider"><span>or select your name</span></div>
+
+            <!-- Existing model dropdown -->
+            <div id="existing-model-section">
+              <div class="form-group">
+                <label>Select Your Name</label>
+                <div class="select-wrap">
+                  <select id="signup-name" onchange="showExistingModelExtras()">
+                    <option value="">— choose your name —</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Show after name selected -->
+              <div id="existing-model-extras" class="hidden">
+                <div class="form-group">
+                  <label>Profile Photo</label>
+                  <div class="profile-photo-upload">
+                    <div class="profile-photo-preview" id="existing-profile-preview" onclick="document.getElementById('existing-profile-input').click()">
+                      📸
+                      <input type="file" id="existing-profile-input" accept="image/*" onchange="previewExistingProfile(this)"/>
+                    </div>
+                    <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to add your profile photo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Ethnicity / Country</label>
+                  <div class="select-wrap">
+                    <select id="existing-ethnicity">
+                      <option value="">Select your country</option>
+                      <option value="Australian">🇦🇺 Australian</option>
+                      <option value="Burundian">🇧🇮 Burundian</option>
+                      <option value="Cameroonian">🇨🇲 Cameroonian</option>
+                      <option value="Chinese">🇨🇳 Chinese</option>
+                      <option value="Congolese">🇨🇩 Congolese</option>
+                      <option value="Ethiopian">🇪🇹 Ethiopian</option>
+                      <option value="Filipino">🇵🇭 Filipino</option>
+                      <option value="Ghanaian">🇬🇭 Ghanaian</option>
+                      <option value="Indian">🇮🇳 Indian</option>
+                      <option value="Indonesian">🇮🇩 Indonesian</option>
+                      <option value="Ivorian">🇨🇮 Ivorian</option>
+                      <option value="Jamaican">🇯🇲 Jamaican</option>
+                      <option value="Japanese">🇯🇵 Japanese</option>
+                      <option value="Kenyan">🇰🇪 Kenyan</option>
+                      <option value="Korean">🇰🇷 Korean</option>
+                      <option value="Lebanese">🇱🇧 Lebanese</option>
+                      <option value="Mozambican">🇲🇿 Mozambican</option>
+                      <option value="Nigerian">🇳🇬 Nigerian</option>
+                      <option value="Pakistani">🇵🇰 Pakistani</option>
+                      <option value="Rwandan">🇷🇼 Rwandan</option>
+                      <option value="Samoan">🇼🇸 Samoan</option>
+                      <option value="Seychellois">🇸🇨 Seychellois</option>
+                      <option value="Sierra Leonean">🇸🇱 Sierra Leonean</option>
+                      <option value="Somali">🇸🇴 Somali</option>
+                      <option value="South African">🇿🇦 South African</option>
+                      <option value="Sri Lankan">🇱🇰 Sri Lankan</option>
+                      <option value="Sudanese">🇸🇩 Sudanese</option>
+                      <option value="Swiss">🇨🇭 Swiss</option>
+                      <option value="Tanzanian">🇹🇿 Tanzanian</option>
+                      <option value="Togolese">🇹🇬 Togolese</option>
+                      <option value="Tongan">🇹🇴 Tongan</option>
+                      <option value="Ugandan">🇺🇬 Ugandan</option>
+                      <option value="Vietnamese">🇻🇳 Vietnamese</option>
+                      <option value="Zimbabwean">🇿🇼 Zimbabwean</option>
+                      <option value="Other">🌍 Other</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Face Close-Up Photo</label>
+                  <input type="file" id="ex-face" accept="image/*"/>
+                </div>
+                <div class="form-group">
+                  <label>Base Fit Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-fit').click()">
+                    <input type="file" id="ex-fit" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-fit','ex-fit-status')"/>
+                    <div class="upload-zone-icon">📸</div>
+                    <div class="upload-zone-text" id="ex-fit-status">Tap to add base fits</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Hair Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-hair').click()">
+                    <input type="file" id="ex-hair" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-hair','ex-hair-status')"/>
+                    <div class="upload-zone-icon">💇</div>
+                    <div class="upload-zone-text" id="ex-hair-status">Tap to add hair inspo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Makeup Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-mua').click()">
+                    <input type="file" id="ex-mua" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-mua','ex-mua-status')"/>
+                    <div class="upload-zone-icon">💄</div>
+                    <div class="upload-zone-text" id="ex-mua-status">Tap to add makeup inspo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Current Outfits You Have That Fit The Streetwear/Traditional Theme <span style="color:var(--dim)">(optional, up to 3 — these will auto-add to inventory under your name)</span></label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-outfit').click()">
+                    <input type="file" id="ex-outfit" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-outfit','ex-outfit-status')"/>
+                    <div class="upload-zone-icon">👕</div>
+                    <div class="upload-zone-text" id="ex-outfit-status">Tap to add fits you already own that match the theme</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Notes (optional)</label>
+                  <textarea id="ex-note" placeholder="Anything you want the hair, makeup or styling team to know…"></textarea>
+                </div>
+              </div>
+            </div>
+            <div id="new-model-form" class="hidden">
+              <div class="form-group">
+                <label>Profile Photo</label>
+                <div class="profile-photo-upload">
+                  <div class="profile-photo-preview" id="profile-preview" onclick="document.getElementById('profile-photo-input').click()">
+                    📸
+                    <input type="file" id="profile-photo-input" accept="image/*" onchange="previewProfile(this)"/>
+                  </div>
+                  <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload your profile photo</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="new-full-name" placeholder="e.g. Jordan Sullivan"/>
+              </div>
+              <div class="form-group">
+                <label>Instagram @</label>
+                <input type="text" id="new-instagram" placeholder="handle without @" autocapitalize="none"/>
+              </div>
+              <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" id="new-phone" placeholder="04xx xxx xxx"/>
+              </div>
+              <div class="form-group">
+                <label>Age</label>
+                <input type="number" id="new-age" placeholder="e.g. 21" min="14" max="40"/>
+              </div>
+              <div class="form-group">
+                <label>Gender</label>
+                <div class="select-wrap">
+                  <select id="new-gender">
+                    <option value="">Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Non-binary">Non-binary</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Ethnicity / Country</label>
+                <div class="select-wrap">
+                  <select id="new-ethnicity">
+                    <option value="">Select</option>
+                    <option value="Australian">🇦🇺 Australian</option>
+                    <option value="Burundian">🇧🇮 Burundian</option>
+                    <option value="Cameroonian">🇨🇲 Cameroonian</option>
+                    <option value="Chinese">🇨🇳 Chinese</option>
+                    <option value="Congolese">🇨🇩 Congolese</option>
+                    <option value="Ethiopian">🇪🇹 Ethiopian</option>
+                    <option value="Filipino">🇵🇭 Filipino</option>
+                    <option value="Ghanaian">🇬🇭 Ghanaian</option>
+                    <option value="Indian">🇮🇳 Indian</option>
+                    <option value="Indonesian">🇮🇩 Indonesian</option>
+                    <option value="Ivorian">🇨🇮 Ivorian</option>
+                    <option value="Jamaican">🇯🇲 Jamaican</option>
+                    <option value="Japanese">🇯🇵 Japanese</option>
+                    <option value="Kenyan">🇰🇪 Kenyan</option>
+                    <option value="Korean">🇰🇷 Korean</option>
+                    <option value="Lebanese">🇱🇧 Lebanese</option>
+                    <option value="Mozambican">🇲🇿 Mozambican</option>
+                    <option value="Nigerian">🇳🇬 Nigerian</option>
+                    <option value="Pakistani">🇵🇰 Pakistani</option>
+                    <option value="Rwandan">🇷🇼 Rwandan</option>
+                    <option value="Samoan">🇼🇸 Samoan</option>
+                    <option value="Seychellois">🇸🇨 Seychellois</option>
+                    <option value="Sierra Leonean">🇸🇱 Sierra Leonean</option>
+                    <option value="Somali">🇸🇴 Somali</option>
+                    <option value="South African">🇿🇦 South African</option>
+                    <option value="Sri Lankan">🇱🇰 Sri Lankan</option>
+                    <option value="Sudanese">🇸🇩 Sudanese</option>
+                    <option value="Swiss">🇨🇭 Swiss</option>
+                    <option value="Tanzanian">🇹🇿 Tanzanian</option>
+                    <option value="Togolese">🇹🇬 Togolese</option>
+                    <option value="Tongan">🇹🇴 Tongan</option>
+                    <option value="Ugandan">🇺🇬 Ugandan</option>
+                    <option value="Vietnamese">🇻🇳 Vietnamese</option>
+                    <option value="Zimbabwean">🇿🇼 Zimbabwean</option>
+                    <option value="Other">🌍 Other</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Height</label>
+                <input type="text" id="new-height" placeholder="e.g. 5'11"/>
+              </div>
+              <div class="form-group">
+                <label>Top Size</label>
+                <div class="select-wrap">
+                  <select id="new-top">
+                    <option value="">Select</option>
+                    <option value="XS">XS</option>
+                    <option value="S">S</option>
+                    <option value="M">M</option>
+                    <option value="L">L</option>
+                    <option value="XL">XL</option>
+                    <option value="XXL">XXL</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Jean Size</label>
+                <input type="text" id="new-jeans" placeholder="e.g. 32"/>
+              </div>
+              <div class="form-group">
+                <label>Suburb</label>
+                <input type="text" id="new-suburb" placeholder="e.g. Logan"/>
+              </div>
+              <div class="form-group">
+                <label>Style / Aesthetic</label>
+                <input type="text" id="new-style" placeholder="e.g. streetwear, clean, minimal"/>
+              </div>
+              <div class="form-group">
+                <label>Do you have a cultural piece to bring?</label>
+                <div class="select-wrap">
+                  <select id="new-cultural" onchange="document.getElementById('new-cultural-desc-group').style.display = this.value==='no'?'none':'block'">
+                    <option value="no">No</option>
+                    <option value="have">Yes, I have access to one</option>
+                    <option value="try">I can try to get one</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group" id="new-cultural-desc-group" style="display:none">
+                <label>Describe your cultural piece</label>
+                <input type="text" id="new-cultural-desc" placeholder="e.g. Fulani jubba, kuffiyah…"/>
+              </div>
+              <div class="form-group">
+                <label>Do you have a talent to perform?</label>
+                <div class="select-wrap">
+                  <select id="new-talent">
+                    <option value="false">No</option>
+                    <option value="true">Yes</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group" id="new-talent-desc-group" style="display:none">
+                <label>Describe your talent</label>
+                <input type="text" id="new-talent-desc" placeholder="e.g. singing, dance, poetry…"/>
+              </div>
+              <div class="form-group">
+                <label>Are you free the WHOLE DAY on July 5?</label>
+                <div class="select-wrap">
+                  <select id="new-free">
+                    <option value="true">Yes, all day</option>
+                    <option value="false">Busy in the morning</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Are you open to working with the hairstylist to change your hair for the event?</label>
+                <div class="select-wrap">
+                  <select id="new-hair-ok">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Can you do your own makeup?</label>
+                <div class="select-wrap">
+                  <select id="new-makeup-self">
+                    <option value="true">Yes</option>
+                    <option value="false">No — I need a MUA</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Are you signed to an agency?</label>
+                <div class="select-wrap">
+                  <select id="new-agency">
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Face Close-Up Photo</label>
+                <input type="file" id="new-face1" accept="image/*"/>
+              </div>
+              <div class="form-group">
+                <label>Base Fit Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <input type="file" id="new-fit" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+              </div>
+              <div class="form-group">
+                <label>Hair Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <input type="file" id="new-hair-photos" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+              </div>
+              <div class="form-group">
+                <label>Makeup Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <input type="file" id="new-mua-photos" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+              </div>
+              <div class="form-group">
+                <label>Current Outfits You Have That Fit The Streetwear/Traditional Theme <span style="color:var(--dim)">(optional, up to 3 — these will auto-add to inventory under your name)</span></label>
+                <input type="file" id="new-outfit" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+              </div>
+              <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea id="new-note" placeholder="Anything for the hair, makeup or styling team…"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- STAFF FLOW -->
+          <div id="staff-signup-flow" class="hidden">
+            <div class="form-group">
+              <label>Your Name</label>
+              <div class="select-wrap">
+                <select id="signup-name-staff">
+                  <option value="">— choose your name —</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- CREDENTIALS (shared) -->
+          <div id="signup-credentials-group" class="hidden">
+            <div class="form-group">
+              <label>Choose your username for the app</label>
+              <input type="text" id="signup-username" placeholder="e.g. jordan.sullivan" autocapitalize="none" autocorrect="off"/>
+            </div>
+            <div class="form-group">
+              <label>Create a 4-Digit PIN</label>
+              <input type="password" id="signup-pin" placeholder="e.g. 1234" maxlength="4" inputmode="numeric"/>
+            </div>
+          </div>
+
+          <button class="btn btn-brown hidden" id="signup-btn" onclick="signUp()">Create Account</button>
+          <div class="error-msg" id="signup-error"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ADMIN DASHBOARD -->
+  <section id="admin-dashboard" class="dashboard hidden">
+    <div class="sidebar">
+      <div class="sidebar-logo">VDG</div>
+      <div class="sidebar-event">Brisbane — Jul 5</div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" onclick="adminNav('models',this)"><span class="nav-icon">◉</span> All Models</button>
+        <button class="nav-item" onclick="adminNav('inventory',this)"><span class="nav-icon">◫</span> Inventory</button>
+        <button class="nav-item" onclick="adminNav('team',this)"><span class="nav-icon">◈</span> Team</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user-name" id="admin-name-display">—</div>
+        <div class="sidebar-user-role">Admin</div>
+        <button class="signout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+    <main class="main-content">
+      <div class="topbar">
+        <div class="topbar-title" id="admin-page-title">All Models</div>
+        <div class="topbar-actions">
+          <input type="text" class="search-input" placeholder="Search…" oninput="filterModels(this.value)" id="model-search"/>
+        </div>
+      </div>
+      <div id="admin-models-panel" class="panel-content">
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="setAdminTab(this,'all')">All</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'approved')">Approved</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'pending')">Pending</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'completed')">Completed</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'inventory')">Inventory</button>
+        </div>
+        <div id="models-tab-content">
+          <div class="model-grid" id="admin-model-grid"></div>
+        </div>
+        <div id="inventory-tab-content" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <span class="dim-text" id="inv-count">0 items</span>
+            <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+          </div>
+          <div class="inv-grid" id="inv-grid"></div>
+        </div>
+      </div>
+      <div id="admin-team-panel" class="panel-content hidden">
+        <div class="team-grid" id="team-grid"></div>
+      </div>
+    </main>
+  </section>
+
+  <!-- STAFF DASHBOARD -->
+  <section id="staff-dashboard" class="dashboard hidden">
+    <div class="sidebar">
+      <div class="sidebar-logo">VDG</div>
+      <div class="sidebar-event">Brisbane — Jul 5</div>
+      <nav class="sidebar-nav">
+        <div style="padding:10px 12px;font-size:11px;color:rgba(255,255,255,.4);font-family:var(--font-mono);line-height:1.7">
+          Use the tabs above the models to switch between All Models, your selected models, and Inventory.
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-user-name" id="staff-name-display">—</div>
+        <div class="sidebar-user-role" id="staff-role-display">Staff</div>
+        <button class="signout-btn" onclick="logout()">Sign Out</button>
+      </div>
+    </div>
+    <main class="main-content">
+      <div class="topbar">
+        <div class="topbar-title" id="staff-page-title">All Models</div>
+        <div class="topbar-actions">
+          <input type="text" class="search-input" placeholder="Search…" oninput="filterStaffModels(this.value)"/>
+        </div>
+      </div>
+      <div class="panel-content">
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
+          <button class="tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
+          <button class="tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>
+        </div>
+        <div id="staff-models-content">
+          <div class="model-grid" id="staff-model-grid"></div>
+        </div>
+        <div id="staff-inventory-content" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <span class="dim-text" id="staff-inv-count">0 items</span>
+            <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+          </div>
+          <div class="inv-grid" id="staff-inv-grid"></div>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- MODEL DASHBOARD -->
+  <section id="model-dashboard" class="dashboard hidden">
+    <div class="mob-topbar">
+      <div class="mob-logo">VDG</div>
+      <button class="signout-btn" onclick="logout()">Out</button>
+    </div>
+    <div class="model-profile-wrap" id="model-profile-wrap"></div>
+  </section>
+
+  <!-- MODEL DETAIL PANEL -->
+  <div class="panel-overlay hidden" id="model-panel-overlay" onclick="closeModelPanel(event)">
+    <div class="model-panel" id="model-panel">
+      <div class="panel-header">
+        <div style="flex:1;min-width:0">
+          <div class="panel-name" id="panel-name"></div>
+          <div class="panel-handle" id="panel-handle"></div>
+        </div>
+        <div class="panel-flag" id="panel-flag"></div>
+        <button class="panel-close" onclick="closePanel()">✕</button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+    </div>
+  </div>
+
+  <!-- INVENTORY MODAL -->
+  <div class="modal-overlay hidden" id="inv-modal-overlay" onclick="closeInvModal(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <span style="font-family:var(--font-display);font-size:22px;font-weight:400;letter-spacing:.04em">Add Inventory Item</span>
+        <button class="panel-close" onclick="document.getElementById('inv-modal-overlay').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Photo of Item</label>
+          <div class="inv-photo-preview" id="inv-photo-preview" onclick="document.getElementById('inv-photo-input').click()">
+            <input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
+            <div id="inv-photo-placeholder">
+              <div style="font-size:28px;margin-bottom:6px">👕</div>
+              <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div>
+            </div>
+          </div>
+        </div>
+        <div class="form-group"><label>Item Name <span style="color:var(--dim)">(optional)</span></label><input id="inv-name" placeholder="e.g. Cream oversized blazer"/></div>
+        <div class="form-group"><label>Size <span style="color:var(--dim)">(optional)</span></label><input id="inv-size" placeholder="e.g. S/M, 32, one size"/></div>
+        <div class="form-group"><label>Category</label>
+          <div class="select-wrap">
+            <select id="inv-cat">
+              <option value="Top">Top</option>
+              <option value="Bottom">Bottom</option>
+              <option value="Outerwear">Outerwear</option>
+              <option value="Accessory">Accessory</option>
+              <option value="Shoes">Shoes</option>
+              <option value="Full Look">Full Look</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label>Assign to Model <span style="color:var(--dim)">(optional)</span></label>
+          <div class="select-wrap">
+            <select id="inv-model-assign"><option value="">Unassigned</option></select>
+          </div>
+        </div>
+        <button class="btn btn-brown" onclick="saveInvItem()">Save Item</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
+</body>
+</html>
