@@ -443,3 +443,28 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 }
 .stage-fit-item img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
 .stage-fit-label { padding: 6px 8px; font-size: 10px; font-family: var(--font-mono); color: var(--dim); }
+
+/* ── COLLAPSIBLE PHOTO SECTIONS (panel) ── */
+.collapse-section { border: 1.5px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.collapse-btn {
+  width: 100%;
+  text-align: left;
+  padding: 13px 16px;
+  background: var(--surface);
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background .15s;
+}
+.collapse-btn:hover { background: var(--cream); }
+.collapse-arrow { transition: transform .2s; color: var(--dim); font-size: 11px; }
+.collapse-section.open .collapse-arrow { transform: rotate(180deg); }
+.collapse-body { display: none; padding: 16px; }
+.collapse-section.open .collapse-body { display: block; }
