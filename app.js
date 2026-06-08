@@ -68,6 +68,13 @@ function markUploaded(inputId, statusId) {
   if (inp && inp.files.length && st) st.textContent = `✓ ${inp.files.length} selected`;
 }
 
+// Limit a file input to max N files; warn if exceeded
+function limitFiles(input, max) {
+  if (input.files.length > max) {
+    toast(`Max ${max} photos — only the first ${max} will be used`, true);
+  }
+}
+
 function previewExistingProfile(input) {
   const file = input.files[0]; if (!file) return;
   const r = new FileReader();
@@ -147,9 +154,11 @@ function toggleNewModel() {
 // ═══════════════════════════════════════════════
 // UPLOAD HELPER — returns array of public URLs
 // ═══════════════════════════════════════════════
-async function uploadFiles(fileList, folder, subfolder) {
+async function uploadFiles(fileList, folder, subfolder, max) {
   const urls = [];
-  for (const file of Array.from(fileList)) {
+  let files = Array.from(fileList);
+  if (max && files.length > max) files = files.slice(0, max);
+  for (const file of files) {
     const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}_${file.name}`;
     const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true });
     if (!error) {
@@ -212,16 +221,17 @@ async function signUpExistingModel(username, pin) {
     const u = await uploadFiles([profInput.files[0]], nameVal, 'profile');
     if (u.length) profileUrl = u[0];
   }
-  // Fit / hair / mua
-  const faceUrls = await uploadFiles(document.getElementById('ex-face').files, nameVal, 'face');
-  const fitUrls  = await uploadFiles(document.getElementById('ex-fit').files,  nameVal, 'fit');
-  const hairUrls = await uploadFiles(document.getElementById('ex-hair').files, nameVal, 'hair');
-  const muaUrls  = await uploadFiles(document.getElementById('ex-mua').files,  nameVal, 'mua');
+  // Fit / hair / mua / outfit (max 3 each)
+  const faceUrls   = await uploadFiles(document.getElementById('ex-face').files,   nameVal, 'face', 1);
+  const fitUrls    = await uploadFiles(document.getElementById('ex-fit').files,    nameVal, 'fit', 3);
+  const hairUrls   = await uploadFiles(document.getElementById('ex-hair').files,   nameVal, 'hair', 3);
+  const muaUrls    = await uploadFiles(document.getElementById('ex-mua').files,    nameVal, 'mua', 3);
+  const outfitUrls = await uploadFiles(document.getElementById('ex-outfit').files, nameVal, 'outfit', 3);
 
   const ethnicity = document.getElementById('existing-ethnicity')?.value || '';
   const note      = document.getElementById('ex-note')?.value.trim() || '';
 
-  const updates = { username, pin, registered:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
+  const updates = { username, pin, registered:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
   if (profileUrl) updates.profile_photo = profileUrl;
   if (ethnicity)  updates.ethnicity = ethnicity;
 
@@ -249,10 +259,13 @@ async function signUpNewModel(username, pin) {
   }
   const faceUrls = [];
   const f1 = document.getElementById('new-face1');
-  if (f1 && f1.files[0]) { const u = await uploadFiles([f1.files[0]], folder, 'face'); faceUrls.push(...u); }
-  const fitUrls  = await uploadFiles(document.getElementById('new-fit').files,        folder, 'fit');
-  const hairUrls = await uploadFiles(document.getElementById('new-hair-photos').files, folder, 'hair');
-  const muaUrls  = await uploadFiles(document.getElementById('new-mua-photos').files,  folder, 'mua');
+  if (f1 && f1.files[0]) { const u = await uploadFiles([f1.files[0]], folder, 'face', 1); faceUrls.push(...u); }
+  const fitUrls    = await uploadFiles(document.getElementById('new-fit').files,         folder, 'fit', 3);
+  const hairUrls   = await uploadFiles(document.getElementById('new-hair-photos').files, folder, 'hair', 3);
+  const muaUrls    = await uploadFiles(document.getElementById('new-mua-photos').files,  folder, 'mua', 3);
+  const outfitUrls = await uploadFiles(document.getElementById('new-outfit').files,      folder, 'outfit', 3);
+
+  const culturalVal = document.getElementById('new-cultural').value; // 'no' | 'have' | 'try'
 
   const payload = {
     full_name:     fullName,
@@ -266,7 +279,7 @@ async function signUpNewModel(username, pin) {
     jean_size:     document.getElementById('new-jeans').value.trim(),
     suburb:        document.getElementById('new-suburb').value.trim(),
     style:         document.getElementById('new-style').value.trim(),
-    cultural_piece:document.getElementById('new-cultural').value==='true',
+    cultural_piece:culturalVal,
     cultural_desc: document.getElementById('new-cultural-desc').value.trim(),
     talent:        document.getElementById('new-talent').value==='true',
     talent_desc:   document.getElementById('new-talent-desc').value.trim(),
@@ -277,7 +290,7 @@ async function signUpNewModel(username, pin) {
     model_note:    document.getElementById('new-note').value.trim(),
     username, pin, registered:true, approved:false,
     profile_photo: profileUrl, face_photos:faceUrls,
-    photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls,
+    photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls,
     tags:[], notes:'',
     needs_hair:true, needs_makeup:true,
     checklist_outfit:false, checklist_hair:false, checklist_makeup:false,
@@ -521,8 +534,12 @@ async function setStatus(id, status) {
 // ═══════════════════════════════════════════════
 // MODEL DETAIL PANEL
 // ═══════════════════════════════════════════════
-function openModelPanel(id) {
-  const m = allModels.find(x=>String(x.id)===String(id));
+async function openModelPanel(id) {
+  let m = allModels.find(x=>String(x.id)===String(id));
+  if (!m) {
+    const { data } = await sb.from('model_profiles').select('*').eq('id', id).maybeSingle();
+    if (data) { m = data; allModels.push(data); }
+  }
   if (!m) { toast('Could not load model', true); return; }
   openModelData = m;
 
@@ -559,11 +576,37 @@ function openModelPanel(id) {
       </div>`;
   }
 
-  // ── Photo blocks ──
-  const fitBlock  = `<div><div class="panel-section-title">Base Fit Photos</div>${photos.length?`<div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded</div>'}</div>`;
-  const hairBlock = `<div><div class="panel-section-title">Hair Inspo</div>${hairPh.length?`<div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded</div>'}</div>`;
-  const muaBlock  = `<div><div class="panel-section-title">Makeup Inspo</div>${muaPh.length?`<div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded</div>'}</div>`;
-  const faceBlock = facePh.length?`<div><div class="panel-section-title">Face Close-Ups</div><div class="photo-grid">${facePh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:'';
+  // ── Collapsible photo sections (Face / Hair+Makeup / Outfit) ──
+  const outfitPh = m.outfit_photos || [];
+  const photoGrid = (arr) => arr.length ? `<div class="photo-grid">${arr.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>` : '<div class="no-photos">None uploaded</div>';
+
+  const faceSection = `
+    <div class="collapse-section">
+      <button class="collapse-btn" onclick="toggleCollapse(this)">👤 Face Photos <span class="collapse-arrow">▾</span></button>
+      <div class="collapse-body">${photoGrid(facePh)}</div>
+    </div>`;
+
+  const hairMuaSection = `
+    <div class="collapse-section">
+      <button class="collapse-btn" onclick="toggleCollapse(this)">💇 Hair & Makeup Inspo <span class="collapse-arrow">▾</span></button>
+      <div class="collapse-body">
+        <div class="panel-section-title" style="margin-top:4px">Hair Inspo</div>${photoGrid(hairPh)}
+        <div class="panel-section-title" style="margin-top:16px">Makeup Inspo</div>${photoGrid(muaPh)}
+      </div>
+    </div>`;
+
+  // Outfit = assigned inventory + model's own fit photos + outfit photos
+  const invHTML = modelInv.length ? `<div class="panel-section-title" style="margin-top:4px">Assigned Inventory</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div>` : '';
+  const ownFits = [...photos, ...outfitPh];
+  const outfitSection = `
+    <div class="collapse-section">
+      <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Outfit <span class="collapse-arrow">▾</span></button>
+      <div class="collapse-body">
+        ${invHTML}
+        <div class="panel-section-title" style="margin-top:${invHTML?'16px':'4px'}">Model's Own Fits</div>${photoGrid(ownFits)}
+      </div>
+    </div>`;
+
   const noteBlock = m.model_note?`<div><div class="panel-section-title">Note from Model</div><div class="val" style="font-size:14px">${m.model_note}</div></div>`:'';
 
   // ── Details block ──
@@ -586,8 +629,7 @@ function openModelPanel(id) {
       </div>
     </div>
     ${m.talent?`<div><div class="panel-section-title">Talent</div><div class="val">${m.talent_desc||'—'}</div></div>`:''}
-    ${m.cultural_piece?`<div><div class="panel-section-title">Cultural Piece</div><div class="val">${m.cultural_desc||'—'}</div></div>`:''}
-    ${modelInv.length?`<div><div class="panel-section-title">Stage Fit — Inventory</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
+    ${m.cultural_piece&&m.cultural_piece!=='no'&&m.cultural_piece!=='false'?`<div><div class="panel-section-title">Cultural Piece</div><div class="val">${m.cultural_piece==='try'?'Can try to get one':'Has access to one'}${m.cultural_desc?' — '+m.cultural_desc:''}</div></div>`:''}
   `;
 
   // ── Admin assignment block ──
@@ -627,23 +669,29 @@ function openModelPanel(id) {
       <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
     </div>` : '';
 
-  // ── ORDER: hair/mua see photos+note first. Stylists see fit first. Admin sees details first. ──
+  // ── ORDER per role. Photos are in collapsible buttons. Each role's most relevant button comes first. ──
   let body = '';
   if (statusHTML) body += statusHTML;
 
   if (role === 'HAIR_STYLIST') {
-    body += hairBlock + noteBlock + muaBlock + faceBlock + fitBlock + detailsBlock;
+    body += hairMuaSection + noteBlock + faceSection + outfitSection + detailsBlock;
   } else if (role === 'MAKEUP_ARTIST') {
-    body += muaBlock + noteBlock + hairBlock + faceBlock + fitBlock + detailsBlock;
+    body += hairMuaSection + noteBlock + faceSection + outfitSection + detailsBlock;
   } else if (role === 'STYLIST') {
-    body += fitBlock + noteBlock + hairBlock + muaBlock + faceBlock + detailsBlock;
+    body += outfitSection + noteBlock + faceSection + hairMuaSection + detailsBlock;
   } else { // ADMIN
-    body += detailsBlock + adminBlock + faceBlock + fitBlock + hairBlock + muaBlock + (m.model_note?noteBlock:'');
+    body += detailsBlock + adminBlock + faceSection + outfitSection + hairMuaSection + (m.model_note?noteBlock:'');
   }
 
   document.getElementById('panel-body').innerHTML = body;
   document.getElementById('model-panel-overlay').classList.remove('hidden');
   document.body.style.overflow='hidden';
+}
+
+// Toggle collapsible photo sections in the panel
+function toggleCollapse(btn) {
+  const sec = btn.parentElement;
+  sec.classList.toggle('open');
 }
 
 function closePanel() {
@@ -690,6 +738,9 @@ async function showStaffDashboard(user) {
   document.getElementById('staff-name-display').textContent = user.name;
   const labels = {STYLIST:'Stylist',HAIR_STYLIST:'Hair Stylist',MAKEUP_ARTIST:'Makeup Artist'};
   document.getElementById('staff-role-display').textContent = labels[user.role]||'Staff';
+  // Inventory only for stylists (and admin). Hide for hair/makeup.
+  const invTab = document.getElementById('staff-inv-tab');
+  if (invTab) invTab.style.display = (user.role==='STYLIST') ? '' : 'none';
   await loadAllModels();
   await loadInventory();
   staffTab='all';
@@ -828,7 +879,7 @@ async function showModelDashboard(model) {
           <div class="detail-item"><label>Top</label><div class="val">${model.top_size||'—'}</div></div>
           <div class="detail-item"><label>Jeans</label><div class="val">${model.jean_size||'—'}</div></div>
           <div class="detail-item"><label>Style</label><div class="val">${model.style||'—'}</div></div>
-          <div class="detail-item"><label>Cultural Piece</label><div class="val">${model.cultural_piece?model.cultural_desc:'None'}</div></div>
+          <div class="detail-item"><label>Cultural Piece</label><div class="val">${model.cultural_piece&&model.cultural_piece!=='no'&&model.cultural_piece!=='false'?(model.cultural_desc||(model.cultural_piece==='try'?'Can try to get one':'Yes')):'None'}</div></div>
         </div>
       </div>
       ${model.assigned_stylist||model.assigned_hair||model.assigned_makeup?`
@@ -844,14 +895,16 @@ async function showModelDashboard(model) {
       ${modelInv.length?`<div class="model-section"><div class="model-section-title">Your Stage Fit</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
       <div class="model-section">
         <div class="model-section-title">Add More Photos</div>
-        <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Add to your base fits, hair inspo, or makeup inspo any time.</p>
+        <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Add to your base fits, hair inspo, makeup inspo, or your own outfit any time.</p>
         <div class="upload-grid">
           <div><label style="margin-bottom:8px">Base Fits</label><div class="upload-zone" onclick="document.getElementById('up-fit').click()"><input type="file" id="up-fit" multiple accept="image/*" onchange="uploadMorePhotos(this,'photos','${model.id}')"/><div class="upload-zone-icon">📸</div><div class="upload-zone-text">Tap to upload</div></div></div>
           <div><label style="margin-bottom:8px">Hair Inspo</label><div class="upload-zone" onclick="document.getElementById('up-hair').click()"><input type="file" id="up-hair" multiple accept="image/*" onchange="uploadMorePhotos(this,'hair_photos','${model.id}')"/><div class="upload-zone-icon">💇</div><div class="upload-zone-text">Tap to upload</div></div></div>
           <div><label style="margin-bottom:8px">Makeup Inspo</label><div class="upload-zone" onclick="document.getElementById('up-mua').click()"><input type="file" id="up-mua" multiple accept="image/*" onchange="uploadMorePhotos(this,'mua_photos','${model.id}')"/><div class="upload-zone-icon">💄</div><div class="upload-zone-text">Tap to upload</div></div></div>
+          <div><label style="margin-bottom:8px">Your Own Outfit</label><div class="upload-zone" onclick="document.getElementById('up-outfit').click()"><input type="file" id="up-outfit" multiple accept="image/*" onchange="uploadMorePhotos(this,'outfit_photos','${model.id}')"/><div class="upload-zone-icon">👕</div><div class="upload-zone-text">Tap to upload</div></div></div>
         </div>
         <div id="upload-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:12px"></div>
       </div>
+      ${(model.outfit_photos&&model.outfit_photos.length)?`<div class="model-section"><div class="model-section-title">Your Own Outfit</div><div class="photo-grid">${model.outfit_photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${photos.length?`<div class="model-section"><div class="model-section-title">Your Fits</div><div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${hairPh.length?`<div class="model-section"><div class="model-section-title">Hair Inspo</div><div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${muaPh.length?`<div class="model-section"><div class="model-section-title">Makeup Inspo</div><div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
