@@ -789,17 +789,18 @@ async function saveNotes() {
   toast('Notes saved');
 }
 
-// Permanently delete a model: removes their uploaded photos from storage, then their profile row
+// Permanently delete a model: removes their profile row first (so the dashboard is clean even if
+// storage cleanup below fails), then best-effort deletes their uploaded photos from storage
 async function deleteModel(id, name) {
   if (!confirm(`Permanently delete ${name||'this model'}? This removes their profile and all uploaded photos. This cannot be undone.`)) return;
   const m = allModels.find(x=>String(x.id)===String(id)) || openModelData;
   if (!m) return;
+  const { error } = await sb.from('model_profiles').delete().eq('id', id);
+  if (error) { toast(error.message, true); return; }
   const urls = [m.profile_photo, ...toArr(m.photos), ...toArr(m.hair_photos), ...toArr(m.mua_photos), ...toArr(m.outfit_photos), ...toArr(m.face_photos)].filter(Boolean);
   const marker = '/model-photos/';
   const paths = urls.map(u=>{ const i=u.indexOf(marker); return i>-1 ? u.slice(i+marker.length) : null; }).filter(Boolean);
   if (paths.length) await sb.storage.from('model-photos').remove(paths);
-  const { error } = await sb.from('model_profiles').delete().eq('id', id);
-  if (error) { toast(error.message, true); return; }
   allModels = allModels.filter(x=>String(x.id)!==String(id));
   closePanel();
   refreshCurrentView();
