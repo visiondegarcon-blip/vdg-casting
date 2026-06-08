@@ -6,7 +6,7 @@ const SUPABASE_KEY = "sb_publishable_tKMXDxTa-uICYsBE3OUh7A_RsoGFhhf";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const STAFF_NAMES = {
-  STYLIST:       ["Daniel", "Dee", "Komi"],
+  STYLIST:       ["Daniel", "Dee", "Komi", "Richelle"],
   HAIR_STYLIST:  ["Christie", "Maria", "Neza"],
   MAKEUP_ARTIST: ["Rebecca"],
   ADMIN:         ["Daniel"]
@@ -24,8 +24,14 @@ const FLAG_MAP = {
   "Vietnamese":"🇻🇳","Zimbabwean":"🇿🇼","African":"🌍","East Asian":"🌏",
   "Middle Eastern":"🌍","South Asian":"🌏","Polynesian / Pacific Islands":"🌊","Other":"🌍"
 };
-
 function getFlag(eth) { return FLAG_MAP[eth] || "🌍"; }
+
+// Map role → which status/assignment fields it controls
+const ROLE_FIELDS = {
+  STYLIST:       { status: 'stylist_status', assign: 'assigned_stylist', label: 'Stylist',       hasPending: false },
+  HAIR_STYLIST:  { status: 'hair_status',    assign: 'assigned_hair',    label: 'Hair Stylist',  hasPending: true  },
+  MAKEUP_ARTIST: { status: 'makeup_status',  assign: 'assigned_makeup',  label: 'Makeup Artist', hasPending: true  },
+};
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -33,8 +39,8 @@ function getFlag(eth) { return FLAG_MAP[eth] || "🌍"; }
 let currentUser   = null;
 let allModels     = [];
 let inventoryData = [];
-let activeTab     = 'all';   // 'all' | 'approved' | 'pending' | 'inventory'
-let staffTab      = 'all';   // 'all' | 'mine' | 'inventory'
+let activeTab     = 'all';
+let staffTab      = 'all';
 let openModelData = null;
 let isNewModel    = false;
 
@@ -49,51 +55,40 @@ function showTab(tab) {
 }
 
 // ═══════════════════════════════════════════════
-// SIGNUP — existing model name selected
+// SIGNUP HELPERS
 // ═══════════════════════════════════════════════
 function showExistingModelExtras() {
   const val = document.getElementById('signup-name').value;
   document.getElementById('existing-model-extras').classList.toggle('hidden', !val);
 }
 
+function markUploaded(inputId, statusId) {
+  const inp = document.getElementById(inputId);
+  const st  = document.getElementById(statusId);
+  if (inp && inp.files.length && st) st.textContent = `✓ ${inp.files.length} selected`;
+}
+
 function previewExistingProfile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const p = document.getElementById('existing-profile-preview');
-    p.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-    p.appendChild(input);
-  };
-  reader.readAsDataURL(file);
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => { const p=document.getElementById('existing-profile-preview'); p.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`; p.appendChild(input); };
+  r.readAsDataURL(file);
 }
-
 function previewProfile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const p = document.getElementById('profile-preview');
-    p.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-    p.appendChild(input);
-  };
-  reader.readAsDataURL(file);
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => { const p=document.getElementById('profile-preview'); p.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`; p.appendChild(input); };
+  r.readAsDataURL(file);
 }
-
 function previewInvPhoto(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const p = document.getElementById('inv-photo-preview');
-    p.innerHTML = `<img src="${e.target.result}" alt=""/>`;
-    p.appendChild(input);
-  };
-  reader.readAsDataURL(file);
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => { const p=document.getElementById('inv-photo-preview'); p.innerHTML=`<img src="${e.target.result}" alt=""/>`; p.appendChild(input); };
+  r.readAsDataURL(file);
 }
 
 // ═══════════════════════════════════════════════
-// SIGNUP — load names
+// LOAD NAMES ON ROLE SELECT
 // ═══════════════════════════════════════════════
 async function loadSignupNames() {
   const role = document.getElementById('signup-role').value;
@@ -137,17 +132,34 @@ function toggleNewModel() {
   document.getElementById('existing-model-section').classList.toggle('hidden', isNewModel);
   const toggle = document.querySelector('.new-model-toggle');
   if (isNewModel) {
-    toggle.style.background = 'var(--brown)';
-    toggle.style.borderColor = 'var(--brown)';
-    toggle.querySelector('.new-model-toggle-text').style.color = 'white';
-    toggle.querySelector('.new-model-toggle-sub').style.color = 'rgba(255,255,255,.7)';
-    toggle.querySelector('.new-model-toggle-icon').textContent = '✓';
+    toggle.style.background='var(--brown)'; toggle.style.borderColor='var(--brown)';
+    toggle.querySelector('.new-model-toggle-text').style.color='white';
+    toggle.querySelector('.new-model-toggle-sub').style.color='rgba(255,255,255,.7)';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✓';
   } else {
-    toggle.style.cssText = '';
-    toggle.querySelector('.new-model-toggle-text').style.color = '';
-    toggle.querySelector('.new-model-toggle-sub').style.color = '';
-    toggle.querySelector('.new-model-toggle-icon').textContent = '✨';
+    toggle.style.cssText='';
+    toggle.querySelector('.new-model-toggle-text').style.color='';
+    toggle.querySelector('.new-model-toggle-sub').style.color='';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✨';
   }
+}
+
+// ═══════════════════════════════════════════════
+// UPLOAD HELPER — returns array of public URLs
+// ═══════════════════════════════════════════════
+async function uploadFiles(fileList, folder, subfolder) {
+  const urls = [];
+  for (const file of Array.from(fileList)) {
+    const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}_${file.name}`;
+    const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = sb.storage.from('model-photos').getPublicUrl(path);
+      urls.push(data.publicUrl);
+    } else {
+      console.error('Upload error:', error);
+    }
+  }
+  return urls;
 }
 
 // ═══════════════════════════════════════════════
@@ -163,48 +175,59 @@ async function signUp() {
   if (!username) { showError('signup-error','Choose a username.'); return; }
   if (pin.length !== 4 || isNaN(Number(pin))) { showError('signup-error','PIN must be exactly 4 digits.'); return; }
 
-  if (role === 'MODEL') {
-    if (isNewModel) { await signUpNewModel(username,pin); }
-    else            { await signUpExistingModel(username,pin); }
-    return;
-  }
+  const btn = document.getElementById('signup-btn');
+  btn.textContent = 'Creating…'; btn.disabled = true;
 
-  const nameVal = document.getElementById('signup-name-staff').value;
-  if (!nameVal) { showError('signup-error','Select your name.'); return; }
-  const { data:ex } = await sb.from('users').select('id').eq('username',username).maybeSingle();
-  if (ex) { showError('signup-error','Username already taken.'); return; }
-  const { error } = await sb.from('users').insert({ name:nameVal, role, username, pin });
-  if (error) { showError('signup-error',error.message); return; }
-  toast('Account created! Sign in now.');
-  showTab('signin');
+  try {
+    if (role === 'MODEL') {
+      if (isNewModel) { await signUpNewModel(username, pin); }
+      else            { await signUpExistingModel(username, pin); }
+      return;
+    }
+    const nameVal = document.getElementById('signup-name-staff').value;
+    if (!nameVal) { showError('signup-error','Select your name.'); return; }
+    const { data:ex } = await sb.from('users').select('id').eq('username',username).maybeSingle();
+    if (ex) { showError('signup-error','Username already taken.'); return; }
+    const { error } = await sb.from('users').insert({ name:nameVal, role, username, pin });
+    if (error) { showError('signup-error',error.message); return; }
+    toast('Account created! Sign in now.');
+    showTab('signin');
+  } finally {
+    btn.textContent = 'Create Account'; btn.disabled = false;
+  }
 }
 
 async function signUpExistingModel(username, pin) {
-  const nameVal  = document.getElementById('signup-name').value;
+  const nameVal = document.getElementById('signup-name').value;
   if (!nameVal) { showError('signup-error','Select your name.'); return; }
   const { data:ex } = await sb.from('model_profiles').select('id').eq('username',username).maybeSingle();
   if (ex) { showError('signup-error','Username already taken.'); return; }
 
-  // Upload profile photo if provided
+  showError('signup-error','Uploading photos, please wait…');
+
+  // Profile photo
   let profileUrl = '';
   const profInput = document.getElementById('existing-profile-input');
   if (profInput && profInput.files[0]) {
-    const file = profInput.files[0];
-    const path = `${nameVal}/profile/${Date.now()}_${file.name}`;
-    const { error:upErr } = await sb.storage.from('model-photos').upload(path, file, { upsert:true });
-    if (!upErr) {
-      const { data } = sb.storage.from('model-photos').getPublicUrl(path);
-      profileUrl = data.publicUrl;
-    }
+    const u = await uploadFiles([profInput.files[0]], nameVal, 'profile');
+    if (u.length) profileUrl = u[0];
   }
+  // Fit / hair / mua
+  const faceUrls = await uploadFiles(document.getElementById('ex-face').files, nameVal, 'face');
+  const fitUrls  = await uploadFiles(document.getElementById('ex-fit').files,  nameVal, 'fit');
+  const hairUrls = await uploadFiles(document.getElementById('ex-hair').files, nameVal, 'hair');
+  const muaUrls  = await uploadFiles(document.getElementById('ex-mua').files,  nameVal, 'mua');
 
   const ethnicity = document.getElementById('existing-ethnicity')?.value || '';
-  const updates = { username, pin, registered:true };
+  const note      = document.getElementById('ex-note')?.value.trim() || '';
+
+  const updates = { username, pin, registered:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
   if (profileUrl) updates.profile_photo = profileUrl;
   if (ethnicity)  updates.ethnicity = ethnicity;
 
-  const { error } = await sb.from('model_profiles').update(updates).eq('id',nameVal);
+  const { error } = await sb.from('model_profiles').update(updates).eq('id', nameVal);
   if (error) { showError('signup-error',error.message); return; }
+  document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
 }
@@ -215,24 +238,21 @@ async function signUpNewModel(username, pin) {
   const { data:ex } = await sb.from('model_profiles').select('id').eq('username',username).maybeSingle();
   if (ex) { showError('signup-error','Username already taken.'); return; }
 
+  showError('signup-error','Uploading photos, please wait…');
+  const folder = 'new_' + Date.now();
+
   let profileUrl = '';
-  let facePhotos = [];
   const profInput = document.getElementById('profile-photo-input');
   if (profInput && profInput.files[0]) {
-    const file = profInput.files[0];
-    const path = `new_${Date.now()}/profile/${file.name}`;
-    const { error:e } = await sb.storage.from('model-photos').upload(path,file,{upsert:true});
-    if (!e) { const { data } = sb.storage.from('model-photos').getPublicUrl(path); profileUrl = data.publicUrl; }
+    const u = await uploadFiles([profInput.files[0]], folder, 'profile');
+    if (u.length) profileUrl = u[0];
   }
-  for (const id of ['new-face1','new-face2']) {
-    const inp = document.getElementById(id);
-    if (inp && inp.files[0]) {
-      const file = inp.files[0];
-      const path = `new_${Date.now()}/face/${file.name}`;
-      const { error:e } = await sb.storage.from('model-photos').upload(path,file,{upsert:true});
-      if (!e) { const { data } = sb.storage.from('model-photos').getPublicUrl(path); facePhotos.push(data.publicUrl); }
-    }
-  }
+  const faceUrls = [];
+  const f1 = document.getElementById('new-face1');
+  if (f1 && f1.files[0]) { const u = await uploadFiles([f1.files[0]], folder, 'face'); faceUrls.push(...u); }
+  const fitUrls  = await uploadFiles(document.getElementById('new-fit').files,        folder, 'fit');
+  const hairUrls = await uploadFiles(document.getElementById('new-hair-photos').files, folder, 'hair');
+  const muaUrls  = await uploadFiles(document.getElementById('new-mua-photos').files,  folder, 'mua');
 
   const payload = {
     full_name:     fullName,
@@ -254,14 +274,18 @@ async function signUpNewModel(username, pin) {
     hair_ok:       document.getElementById('new-hair-ok').value==='true',
     makeup_self:   document.getElementById('new-makeup-self').value==='true',
     agency:        document.getElementById('new-agency').value,
+    model_note:    document.getElementById('new-note').value.trim(),
     username, pin, registered:true, approved:false,
-    profile_photo: profileUrl, face_photos:facePhotos,
-    photos:[], hair_photos:[], mua_photos:[], tags:[], notes:'',
+    profile_photo: profileUrl, face_photos:faceUrls,
+    photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls,
+    tags:[], notes:'',
+    needs_hair:true, needs_makeup:true,
     checklist_outfit:false, checklist_hair:false, checklist_makeup:false,
   };
 
   const { error } = await sb.from('model_profiles').insert(payload);
   if (error) { showError('signup-error',error.message); return; }
+  document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
 }
@@ -282,7 +306,6 @@ async function signIn() {
     showModelDashboard(model);
     return;
   }
-
   const { data:user } = await sb.from('users').select('*').eq('username',username).maybeSingle();
   if (!user) { showError('signin-error','Username not found.'); return; }
   if (user.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
@@ -292,11 +315,11 @@ async function signIn() {
 }
 
 function logout() {
-  currentUser = null; allModels = [];
+  currentUser=null; allModels=[];
   document.querySelectorAll('.dashboard').forEach(d=>d.classList.add('hidden'));
   document.getElementById('auth-screen').classList.remove('hidden');
-  document.getElementById('signin-username').value = '';
-  document.getElementById('signin-pin').value = '';
+  document.getElementById('signin-username').value='';
+  document.getElementById('signin-pin').value='';
 }
 
 // ═══════════════════════════════════════════════
@@ -306,9 +329,8 @@ async function loadAllModels() {
   const { data } = await sb.from('model_profiles').select('*').order('full_name');
   allModels = data || [];
 }
-
 async function loadInventory() {
-  const { data } = await sb.from('inventory').select('*').order('created_at', {ascending:false});
+  const { data } = await sb.from('inventory').select('*').order('created_at',{ascending:false});
   inventoryData = data || [];
 }
 
@@ -320,38 +342,32 @@ async function showAdminDashboard() {
   document.getElementById('admin-dashboard').classList.remove('hidden');
   document.getElementById('admin-name-display').textContent = currentUser.name;
   await loadAllModels();
+  await loadInventory();
   renderAdminModels();
 }
 
 function adminNav(page, btn) {
   document.querySelectorAll('#admin-dashboard .nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['admin-models-panel','admin-inventory-panel','admin-team-panel'].forEach(id=>{
-    document.getElementById(id).classList.add('hidden');
-  });
-  const titles = { models:'All Models', inventory:'Inventory', team:'Team' };
+  ['admin-models-panel','admin-team-panel'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  const titles = { models:'All Models', team:'Team' };
   document.getElementById('admin-page-title').textContent = titles[page]||'';
   document.getElementById('model-search').style.display = page==='models'?'':'none';
-  if (page==='models')     { document.getElementById('admin-models-panel').classList.remove('hidden'); renderAdminModels(); }
-  else if (page==='team')  { document.getElementById('admin-team-panel').classList.remove('hidden'); renderTeam(); }
+  if (page==='models')    { document.getElementById('admin-models-panel').classList.remove('hidden'); renderAdminModels(); }
+  else if (page==='team') { document.getElementById('admin-team-panel').classList.remove('hidden'); renderTeam(); }
 }
 
-// ═══════════════════════════════════════════════
-// ADMIN TAB NAV (All / Approved / Pending / Inventory)
-// ═══════════════════════════════════════════════
 async function setAdminTab(btn, tab) {
   activeTab = tab;
   document.querySelectorAll('#admin-models-panel .tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-
   const modelsContent = document.getElementById('models-tab-content');
   const invContent    = document.getElementById('inventory-tab-content');
-
-  if (tab === 'inventory') {
+  if (tab==='inventory') {
     modelsContent.classList.add('hidden');
     invContent.classList.remove('hidden');
     await loadInventory();
-    renderInventoryGrid('inv-grid','inv-count', true);
+    renderInventoryGrid('inv-grid','inv-count',true);
   } else {
     modelsContent.classList.remove('hidden');
     invContent.classList.add('hidden');
@@ -359,17 +375,20 @@ async function setAdminTab(btn, tab) {
   }
 }
 
+function isCompleted(m) { return m.checklist_outfit && m.checklist_hair && m.checklist_makeup; }
+
 function renderAdminModels(search) {
   let list = allModels;
   if (search) {
     const q = search.toLowerCase();
     list = list.filter(m=>(m.full_name||'').toLowerCase().includes(q)||(m.instagram||'').toLowerCase().includes(q)||(m.suburb||'').toLowerCase().includes(q));
   }
-  if (activeTab==='approved') list = list.filter(m=>m.approved);
-  if (activeTab==='pending')  list = list.filter(m=>!m.approved);
+  if (activeTab==='approved')  list = list.filter(m=>m.approved);
+  if (activeTab==='pending')   list = list.filter(m=>!m.approved);
+  if (activeTab==='completed') list = list.filter(m=>isCompleted(m));
   const grid = document.getElementById('admin-model-grid');
   if (!grid) return;
-  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,true)).join('') : '<div class="loading-center" style="grid-column:1/-1">No models found</div>';
+  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,'ADMIN')).join('') : '<div class="loading-center" style="grid-column:1/-1">No models here</div>';
 }
 
 function filterModels(val) { if (activeTab!=='inventory') renderAdminModels(val); }
@@ -377,40 +396,46 @@ function filterModels(val) { if (activeTab!=='inventory') renderAdminModels(val)
 // ═══════════════════════════════════════════════
 // MODEL CARD
 // ═══════════════════════════════════════════════
-function modelCardHTML(m, isAdmin) {
+function modelCardHTML(m, viewerRole) {
   const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
-  const approved = m.approved;
   const flag     = getFlag(m.ethnicity);
+  const isAdmin  = viewerRole === 'ADMIN';
 
-  const assignDropdowns = isAdmin ? `
+  // Status pill for staff views
+  let statusPill = '';
+  if (!isAdmin) {
+    const rf = ROLE_FIELDS[viewerRole];
+    const taken = m[rf.assign];
+    if (taken) statusPill = `<span class="badge badge-brown">Taken by ${taken}</span>`;
+  }
+
+  const adminFooter = isAdmin ? `
     <div class="card-footer">
-      <select class="assign-select" title="Stylist" onchange="assignField('${m.id}','assigned_stylist',this.value);event.stopPropagation()">
+      <select class="assign-select" onchange="assignField('${m.id}','assigned_stylist',this.value);event.stopPropagation()">
         <option value="">Stylist…</option>
         ${STAFF_NAMES.STYLIST.map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}
       </select>
-      <select class="assign-select" title="Hair" onchange="assignField('${m.id}','assigned_hair',this.value);event.stopPropagation()">
+      <select class="assign-select" onchange="assignField('${m.id}','assigned_hair',this.value);event.stopPropagation()">
         <option value="">Hair…</option>
         ${STAFF_NAMES.HAIR_STYLIST.map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}
       </select>
-      <select class="assign-select" title="MUA" onchange="assignField('${m.id}','assigned_makeup',this.value);event.stopPropagation()">
+      <select class="assign-select" onchange="assignField('${m.id}','assigned_makeup',this.value);event.stopPropagation()">
         <option value="">MUA…</option>
         ${STAFF_NAMES.MAKEUP_ARTIST.map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}
       </select>
-      <button class="btn-approve${approved?' btn-approved':''}" onclick="toggleApprove('${m.id}');event.stopPropagation()">
-        ${approved?'✓ Approved':'Approve'}
-      </button>
-    </div>
-  ` : `
-    <div class="card-footer">
-      ${m.assigned_stylist?`<span class="badge badge-outline">Stylist: ${m.assigned_stylist}</span>`:''}
-      ${m.assigned_hair?`<span class="badge badge-outline">Hair: ${m.assigned_hair}</span>`:''}
-      ${m.assigned_makeup?`<span class="badge badge-outline">MUA: ${m.assigned_makeup}</span>`:''}
-    </div>
-  `;
+      <button class="btn-approve${m.approved?' btn-approved':''}" onclick="toggleApprove('${m.id}');event.stopPropagation()">${m.approved?'✓ Approved':'Approve'}</button>
+    </div>` : '';
+
+  const checklist = isAdmin ? `
+    <div class="checklist" onclick="event.stopPropagation()">
+      <div class="check-item${m.checklist_outfit?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_outfit',${!m.checklist_outfit})"><span>${m.checklist_outfit?'✓':'○'}</span> Outfit</div>
+      <div class="check-item${m.checklist_hair?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_hair',${!m.checklist_hair})"><span>${m.checklist_hair?'✓':'○'}</span> Hair</div>
+      <div class="check-item${m.checklist_makeup?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_makeup',${!m.checklist_makeup})"><span>${m.checklist_makeup?'✓':'○'}</span> Makeup</div>
+    </div>` : '';
 
   return `
-    <div class="model-card${approved?' approved':''}" onclick="openModelPanel('${m.id}')">
+    <div class="model-card${m.approved?' approved':''}" onclick="openModelPanel('${m.id}')">
       <div class="card-top">
         <div class="card-avatar">${avatar}</div>
         <div class="card-name-block">
@@ -418,108 +443,133 @@ function modelCardHTML(m, isAdmin) {
           <div class="card-handle">${m.instagram?'@'+m.instagram:'—'}</div>
         </div>
         <div class="card-badges">
-          <span class="badge ${approved?'badge-brown':'badge-outline'}">${approved?'✓':'Pending'}</span>
+          ${isAdmin?`<span class="badge ${m.approved?'badge-brown':'badge-outline'}">${m.approved?'✓':'Pending'}</span>`:''}
           <span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender||'—'}</span>
         </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
         ${m.ethnicity?`<span class="badge badge-outline">${m.ethnicity}</span>`:''}
         ${m.talent?'<span class="badge badge-blue">🎤 Talent</span>':''}
-        ${m.agency&&m.agency!=='no'?'<span class="badge badge-yellow">Signed</span>':''}
         ${!m.free_5july?'<span class="badge badge-red">⚠ Busy AM</span>':''}
+        ${statusPill}
       </div>
       <div class="card-details">
         <div class="card-row"><span>Size</span><span>Top ${m.top_size||'—'} · Jean ${m.jean_size||'—'}</span></div>
         <div class="card-row"><span>Height</span><span>${m.height||'—'}</span></div>
         <div class="card-row"><span>Suburb</span><span>${m.suburb||'—'}</span></div>
       </div>
-      <div class="checklist" onclick="event.stopPropagation()">
-        <div class="check-item${m.checklist_outfit?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_outfit',${!m.checklist_outfit})">
-          <span>${m.checklist_outfit?'✓':'○'}</span> Outfit
-        </div>
-        <div class="check-item${m.checklist_hair?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_hair',${!m.checklist_hair})">
-          <span>${m.checklist_hair?'✓':'○'}</span> Hair
-        </div>
-        <div class="check-item${m.checklist_makeup?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_makeup',${!m.checklist_makeup})">
-          <span>${m.checklist_makeup?'✓':'○'}</span> Makeup
-        </div>
-      </div>
-      ${assignDropdowns}
-    </div>
-  `;
+      ${checklist}
+      ${adminFooter}
+    </div>`;
 }
 
 // ═══════════════════════════════════════════════
-// CHECKLIST
+// CHECKLIST / ASSIGN / APPROVE
 // ═══════════════════════════════════════════════
 async function toggleChecklist(id, field, value) {
   await sb.from('model_profiles').update({[field]:value}).eq('id',id);
   const m = allModels.find(x=>String(x.id)===String(id));
-  if (m) m[field] = value;
-  if (currentUser?.role==='ADMIN') renderAdminModels(document.getElementById('model-search')?.value||'');
-  else renderStaffModels();
-  toast(value?'Confirmed ✓':'Unchecked');
+  if (m) m[field]=value;
+  refreshCurrentView();
+  toast(value?'Marked complete ✓':'Unchecked');
 }
-
+async function toggleNeeds(id, field, value) {
+  await sb.from('model_profiles').update({[field]:value}).eq('id',id);
+  const m = allModels.find(x=>String(x.id)===String(id));
+  if (m) m[field]=value;
+  refreshCurrentView();
+  toast(field==='needs_hair'?(value?'Hair team will see this model':'Hidden from hair team'):(value?'Makeup team will see this model':'Hidden from makeup team'));
+}
 async function assignField(id, field, value) {
   await sb.from('model_profiles').update({[field]:value}).eq('id',id);
   const m = allModels.find(x=>String(x.id)===String(id));
-  if (m) m[field] = value;
+  if (m) m[field]=value;
   toast('Saved');
 }
-
 async function toggleApprove(id) {
   const m = allModels.find(x=>String(x.id)===String(id));
   if (!m) return;
   const newVal = !m.approved;
   await sb.from('model_profiles').update({approved:newVal}).eq('id',id);
-  m.approved = newVal;
-  renderAdminModels(document.getElementById('model-search')?.value||'');
+  m.approved=newVal;
+  refreshCurrentView();
   toast((m.full_name||'Model').split(' ')[0]+' '+(newVal?'approved ✓':'unapproved'));
+}
+
+// ═══════════════════════════════════════════════
+// STATUS (work with / pending / reject) — staff only
+// ═══════════════════════════════════════════════
+async function setStatus(id, status) {
+  if (!currentUser) return;
+  const rf = ROLE_FIELDS[currentUser.role];
+  if (!rf) return;
+  const m = allModels.find(x=>String(x.id)===String(id));
+  if (!m) return;
+
+  const updates = {};
+  updates[rf.status] = status;
+  // "working" also assigns them to this staff member (shared visibility)
+  if (status === 'working') updates[rf.assign] = currentUser.name;
+  else if (m[rf.assign] === currentUser.name) updates[rf.assign] = null; // release if they back out
+  await sb.from('model_profiles').update(updates).eq('id', id);
+  Object.assign(m, updates);
+  openModelPanel(id); // refresh panel
+  refreshCurrentView();
+  toast(status==='working'?'Added to My Models ✓':status==='pending'?'Marked pending':'Rejected');
 }
 
 // ═══════════════════════════════════════════════
 // MODEL DETAIL PANEL
 // ═══════════════════════════════════════════════
-async function openModelPanel(id) {
+function openModelPanel(id) {
   const m = allModels.find(x=>String(x.id)===String(id));
-  if (!m) return;
+  if (!m) { toast('Could not load model', true); return; }
   openModelData = m;
 
-  const flag = getFlag(m.ethnicity);
+  const flag    = getFlag(m.ethnicity);
   document.getElementById('panel-name').textContent   = m.full_name||'—';
   document.getElementById('panel-handle').textContent = m.instagram?'@'+m.instagram:'';
   document.getElementById('panel-flag').textContent   = flag;
 
-  const isAdmin = currentUser?.role==='ADMIN';
-  const canEdit = isAdmin || currentUser?.role==='STYLIST'||currentUser?.role==='HAIR_STYLIST'||currentUser?.role==='MAKEUP_ARTIST';
+  const role    = currentUser?.role;
+  const isAdmin = role==='ADMIN';
+  const isHairOrMua = role==='HAIR_STYLIST' || role==='MAKEUP_ARTIST';
   const photos  = m.photos      || [];
   const hairPh  = m.hair_photos || [];
   const muaPh   = m.mua_photos  || [];
   const facePh  = m.face_photos || [];
   const tags    = m.tags        || [];
-
-  // Get inventory items assigned to this model
   const modelInv = inventoryData.filter(i=>i.assigned_model===m.full_name);
 
-  document.getElementById('panel-body').innerHTML = `
-    <div>
-      <div class="panel-section-title">Checklist</div>
-      <div class="checklist">
-        <div class="check-item${m.checklist_outfit?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_outfit',${!m.checklist_outfit});openModelPanel('${m.id}')">
-          <span>${m.checklist_outfit?'✓':'○'}</span> Outfit Confirmed
+  // ── Status action buttons (staff only) ──
+  let statusHTML = '';
+  if (role && ROLE_FIELDS[role]) {
+    const rf = ROLE_FIELDS[role];
+    const cur = m[rf.status];
+    const workingCls = cur==='working' ? ' active-working' : '';
+    const pendingCls = cur==='pending' ? ' active-pending' : '';
+    const rejectCls  = cur==='rejected'? ' active-rejected': '';
+    statusHTML = `
+      <div>
+        <div class="status-actions">
+          <button class="status-btn${workingCls}" onclick="setStatus('${m.id}','working')">✓ Work With</button>
+          ${rf.hasPending?`<button class="status-btn${pendingCls}" onclick="setStatus('${m.id}','pending')">◷ Pending</button>`:''}
+          <button class="status-btn${rejectCls}" onclick="setStatus('${m.id}','rejected')">✕ Reject</button>
         </div>
-        <div class="check-item${m.checklist_hair?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_hair',${!m.checklist_hair});openModelPanel('${m.id}')">
-          <span>${m.checklist_hair?'✓':'○'}</span> Hair Done
-        </div>
-        <div class="check-item${m.checklist_makeup?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_makeup',${!m.checklist_makeup});openModelPanel('${m.id}')">
-          <span>${m.checklist_makeup?'✓':'○'}</span> Makeup Done
-        </div>
-      </div>
-    </div>
+      </div>`;
+  }
 
+  // ── Photo blocks ──
+  const fitBlock  = `<div><div class="panel-section-title">Base Fit Photos</div>${photos.length?`<div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded</div>'}</div>`;
+  const hairBlock = `<div><div class="panel-section-title">Hair Inspo</div>${hairPh.length?`<div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded</div>'}</div>`;
+  const muaBlock  = `<div><div class="panel-section-title">Makeup Inspo</div>${muaPh.length?`<div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded</div>'}</div>`;
+  const faceBlock = facePh.length?`<div><div class="panel-section-title">Face Close-Ups</div><div class="photo-grid">${facePh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:'';
+  const noteBlock = m.model_note?`<div><div class="panel-section-title">Note from Model</div><div class="val" style="font-size:14px">${m.model_note}</div></div>`:'';
+
+  // ── Details block ──
+  const detailsBlock = `
     <div>
-      <div class="panel-section-title">Application Details</div>
+      <div class="panel-section-title">Details</div>
       <div class="detail-grid">
         <div class="detail-item"><label>Age</label><div class="val">${m.age||'—'}</div></div>
         <div class="detail-item"><label>Gender</label><div class="val">${m.gender||'—'}</div></div>
@@ -535,145 +585,99 @@ async function openModelPanel(id) {
         <div class="detail-item"><label>Style</label><div class="val">${m.style||'—'}</div></div>
       </div>
     </div>
-
     ${m.talent?`<div><div class="panel-section-title">Talent</div><div class="val">${m.talent_desc||'—'}</div></div>`:''}
     ${m.cultural_piece?`<div><div class="panel-section-title">Cultural Piece</div><div class="val">${m.cultural_desc||'—'}</div></div>`:''}
-    ${m.portfolio?`<div><div class="panel-section-title">Portfolio</div><a href="${m.portfolio}" target="_blank" style="color:var(--brown);font-size:12px;font-family:var(--font-mono);text-decoration:underline">View →</a></div>`:''}
-
-    ${isAdmin?`
-    <div>
-      <div class="panel-section-title">Staff Assignment</div>
-      <div class="assign-grid">
-        <div class="form-group" style="margin-bottom:0">
-          <label>Stylist</label>
-          <div class="select-wrap">
-            <select onchange="assignField('${m.id}','assigned_stylist',this.value)">
-              <option value="">Unassigned</option>
-              ${STAFF_NAMES.STYLIST.map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label>Hair Stylist</label>
-          <div class="select-wrap">
-            <select onchange="assignField('${m.id}','assigned_hair',this.value)">
-              <option value="">Unassigned</option>
-              ${STAFF_NAMES.HAIR_STYLIST.map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label>MUA</label>
-          <div class="select-wrap">
-            <select onchange="assignField('${m.id}','assigned_makeup',this.value)">
-              <option value="">Unassigned</option>
-              ${STAFF_NAMES.MAKEUP_ARTIST.map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom:0">
-          <label>Status</label>
-          <button class="btn btn-sm ${m.approved?'btn-brown':'btn-ghost'}" onclick="toggleApprove('${m.id}')">
-            ${m.approved?'✓ Approved':'Approve'}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div>
-      <div class="panel-section-title">Tags</div>
-      <div class="tag-row">
-        <input type="text" id="tag-input" placeholder="Add tag…" onkeydown="if(event.key==='Enter')addPanelTag()"/>
-        <button class="btn btn-sm btn-brown" style="width:auto;margin-top:0" onclick="addPanelTag()">+</button>
-      </div>
-      <div class="tags-wrap" id="panel-tags">
-        ${tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('')}
-      </div>
-    </div>
-
-    <div>
-      <div class="panel-section-title">Internal Notes</div>
-      <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Notes for the team…">${m.notes||''}</textarea>
-    </div>`:''}
-
-    ${modelInv.length?`
-    <div>
-      <div class="panel-section-title">Stage Fit — Inventory</div>
-      <div class="stage-fit-grid">
-        ${modelInv.map(item=>`
-          <div class="stage-fit-item">
-            ${item.photo_url?`<img src="${item.photo_url}" alt=""/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}
-            <div class="stage-fit-label">${item.name||item.category} ${item.size_qty?'· '+item.size_qty:''}</div>
-          </div>`).join('')}
-      </div>
-    </div>`:''}
-
-    ${facePh.length?`
-    <div>
-      <div class="panel-section-title">Face Close-Ups</div>
-      <div class="photo-grid">${facePh.map(u=>`<div class="photo-thumb"><img src="${u}" alt=""/></div>`).join('')}</div>
-    </div>`:''}
-
-    <div>
-      <div class="panel-section-title">Base Fit Photos</div>
-      ${photos.length?`<div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}" alt=""/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded yet</div>'}
-    </div>
-
-    <div>
-      <div class="panel-section-title">Hair Inspo</div>
-      ${hairPh.length?`<div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}" alt=""/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded yet</div>'}
-    </div>
-
-    <div>
-      <div class="panel-section-title">Makeup Inspo</div>
-      ${muaPh.length?`<div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}" alt=""/></div>`).join('')}</div>`:'<div class="no-photos">None uploaded yet</div>'}
-    </div>
+    ${modelInv.length?`<div><div class="panel-section-title">Stage Fit — Inventory</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
   `;
 
+  // ── Admin assignment block ──
+  const adminBlock = isAdmin ? `
+    <div>
+      <div class="panel-section-title">Assignment & Status</div>
+      <div class="assign-grid">
+        <div class="form-group" style="margin-bottom:0"><label>Stylist</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_stylist',this.value)"><option value="">Unassigned</option>${STAFF_NAMES.STYLIST.map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
+        <div class="form-group" style="margin-bottom:0"><label>Hair</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_hair',this.value)"><option value="">Unassigned</option>${STAFF_NAMES.HAIR_STYLIST.map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
+        <div class="form-group" style="margin-bottom:0"><label>MUA</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_makeup',this.value)"><option value="">Unassigned</option>${STAFF_NAMES.MAKEUP_ARTIST.map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
+        <div class="form-group" style="margin-bottom:0"><label>Approval</label><button class="btn btn-sm ${m.approved?'btn-brown':'btn-ghost'}" onclick="toggleApprove('${m.id}');openModelPanel('${m.id}')">${m.approved?'✓ Approved':'Approve'}</button></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-section-title">Services Needed</div>
+      <div class="checklist">
+        <div class="check-item${m.needs_hair!==false?' checked':''}" onclick="toggleNeeds('${m.id}','needs_hair',${!(m.needs_hair!==false)});openModelPanel('${m.id}')"><span>${m.needs_hair!==false?'✓':'○'}</span> Needs Hair</div>
+        <div class="check-item${m.needs_makeup!==false?' checked':''}" onclick="toggleNeeds('${m.id}','needs_makeup',${!(m.needs_makeup!==false)});openModelPanel('${m.id}')"><span>${m.needs_makeup!==false?'✓':'○'}</span> Needs Makeup</div>
+      </div>
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Turn off to hide this model from the hair or makeup team.</div>
+    </div>
+    <div>
+      <div class="panel-section-title">Completion Checklist</div>
+      <div class="checklist">
+        <div class="check-item${m.checklist_outfit?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_outfit',${!m.checklist_outfit});openModelPanel('${m.id}')"><span>${m.checklist_outfit?'✓':'○'}</span> Outfit Completed</div>
+        <div class="check-item${m.checklist_hair?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_hair',${!m.checklist_hair});openModelPanel('${m.id}')"><span>${m.checklist_hair?'✓':'○'}</span> Hair Completed</div>
+        <div class="check-item${m.checklist_makeup?' checked':''}" onclick="toggleChecklist('${m.id}','checklist_makeup',${!m.checklist_makeup});openModelPanel('${m.id}')"><span>${m.checklist_makeup?'✓':'○'}</span> Makeup Completed</div>
+      </div>
+    </div>
+    <div>
+      <div class="panel-section-title">Tags</div>
+      <div class="tag-row"><input type="text" id="tag-input" placeholder="Add tag…" onkeydown="if(event.key==='Enter')addPanelTag()"/><button class="btn btn-sm btn-brown" style="width:auto;margin-top:0" onclick="addPanelTag()">+</button></div>
+      <div class="tags-wrap" id="panel-tags">${tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('')}</div>
+    </div>
+    <div>
+      <div class="panel-section-title">Internal Notes</div>
+      <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
+    </div>` : '';
+
+  // ── ORDER: hair/mua see photos+note first. Stylists see fit first. Admin sees details first. ──
+  let body = '';
+  if (statusHTML) body += statusHTML;
+
+  if (role === 'HAIR_STYLIST') {
+    body += hairBlock + noteBlock + muaBlock + faceBlock + fitBlock + detailsBlock;
+  } else if (role === 'MAKEUP_ARTIST') {
+    body += muaBlock + noteBlock + hairBlock + faceBlock + fitBlock + detailsBlock;
+  } else if (role === 'STYLIST') {
+    body += fitBlock + noteBlock + hairBlock + muaBlock + faceBlock + detailsBlock;
+  } else { // ADMIN
+    body += detailsBlock + adminBlock + faceBlock + fitBlock + hairBlock + muaBlock + (m.model_note?noteBlock:'');
+  }
+
+  document.getElementById('panel-body').innerHTML = body;
   document.getElementById('model-panel-overlay').classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+  document.body.style.overflow='hidden';
 }
 
 function closePanel() {
   document.getElementById('model-panel-overlay').classList.add('hidden');
-  document.body.style.overflow = '';
-  openModelData = null;
+  document.body.style.overflow='';
+  openModelData=null;
 }
 function closeModelPanel(e) { if (e.target.id==='model-panel-overlay') closePanel(); }
 
 async function addPanelTag() {
   if (!openModelData) return;
-  const input = document.getElementById('tag-input');
-  const val   = input.value.trim();
-  if (!val) return;
-  const tags = [...(openModelData.tags||[])];
-  if (!tags.includes(val)) tags.push(val);
+  const input=document.getElementById('tag-input'); const val=input.value.trim(); if(!val) return;
+  const tags=[...(openModelData.tags||[])]; if(!tags.includes(val)) tags.push(val);
   await sb.from('model_profiles').update({tags}).eq('id',openModelData.id);
-  openModelData.tags = tags;
-  const m = allModels.find(x=>String(x.id)===String(openModelData.id));
-  if (m) m.tags = tags;
+  openModelData.tags=tags;
+  const m=allModels.find(x=>String(x.id)===String(openModelData.id)); if(m) m.tags=tags;
   input.value='';
-  document.getElementById('panel-tags').innerHTML = tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('');
+  document.getElementById('panel-tags').innerHTML=tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('');
   toast('Tag added');
 }
-
 async function removePanelTag(tag) {
   if (!openModelData) return;
-  const tags = (openModelData.tags||[]).filter(t=>t!==tag);
+  const tags=(openModelData.tags||[]).filter(t=>t!==tag);
   await sb.from('model_profiles').update({tags}).eq('id',openModelData.id);
-  openModelData.tags = tags;
-  const m = allModels.find(x=>String(x.id)===String(openModelData.id));
-  if (m) m.tags = tags;
-  document.getElementById('panel-tags').innerHTML = tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('');
+  openModelData.tags=tags;
+  const m=allModels.find(x=>String(x.id)===String(openModelData.id)); if(m) m.tags=tags;
+  document.getElementById('panel-tags').innerHTML=tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('');
 }
-
 async function saveNotes() {
   if (!openModelData) return;
-  const notes = document.getElementById('panel-notes')?.value||'';
+  const notes=document.getElementById('panel-notes')?.value||'';
   await sb.from('model_profiles').update({notes}).eq('id',openModelData.id);
-  openModelData.notes = notes;
-  const m = allModels.find(x=>String(x.id)===String(openModelData.id));
-  if (m) m.notes = notes;
+  openModelData.notes=notes;
+  const m=allModels.find(x=>String(x.id)===String(openModelData.id)); if(m) m.notes=notes;
   toast('Notes saved');
 }
 
@@ -688,7 +692,7 @@ async function showStaffDashboard(user) {
   document.getElementById('staff-role-display').textContent = labels[user.role]||'Staff';
   await loadAllModels();
   await loadInventory();
-  staffTab = 'all';
+  staffTab='all';
   renderStaffModels();
 }
 
@@ -696,151 +700,99 @@ async function setStaffTab(btn, tab) {
   staffTab = tab;
   document.querySelectorAll('#staff-dashboard .tab-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  const modelsContent = document.getElementById('staff-models-content');
-  const invContent    = document.getElementById('staff-inventory-content');
-
+  const modelsContent=document.getElementById('staff-models-content');
+  const invContent=document.getElementById('staff-inventory-content');
   if (tab==='inventory') {
     modelsContent.classList.add('hidden');
     invContent.classList.remove('hidden');
     await loadInventory();
-    renderInventoryGrid('staff-inv-grid','staff-inv-count', false);
+    renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
   } else {
     modelsContent.classList.remove('hidden');
     invContent.classList.add('hidden');
-    staffViewMode = tab;
     renderStaffModels();
   }
 }
 
-let staffViewMode = 'all';
-
-function staffNav(mode, btn) {
-  // This is now handled by setStaffTab
-}
-
 function renderStaffModels(search) {
   const role = currentUser?.role;
-  const name = currentUser?.name;
-  let list = allModels;
+  const rf   = ROLE_FIELDS[role];
+  let list = allModels.filter(m=>m.approved); // staff only see approved models
+
+  // Hair/Makeup only see models who need that service (default true if column missing)
+  if (role==='HAIR_STYLIST')   list = list.filter(m => m.needs_hair !== false);
+  if (role==='MAKEUP_ARTIST')  list = list.filter(m => m.needs_makeup !== false);
+
   if (staffTab==='mine') {
-    if (role==='STYLIST')        list = list.filter(m=>m.assigned_stylist===name);
-    if (role==='HAIR_STYLIST')   list = list.filter(m=>m.assigned_hair===name);
-    if (role==='MAKEUP_ARTIST')  list = list.filter(m=>m.assigned_makeup===name);
+    list = list.filter(m=>m[rf.assign]===currentUser.name);
   }
   if (search) {
-    const q = search.toLowerCase();
+    const q=search.toLowerCase();
     list = list.filter(m=>(m.full_name||'').toLowerCase().includes(q)||(m.instagram||'').toLowerCase().includes(q));
   }
-  const grid = document.getElementById('staff-model-grid');
+  const grid=document.getElementById('staff-model-grid');
   if (!grid) return;
-  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,false)).join('') : '<div class="loading-center">No models here yet</div>';
+  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,role)).join('') : `<div class="loading-center">${staffTab==='mine'?'No models selected yet':'No approved models yet'}</div>`;
 }
-
 function filterStaffModels(val) { if (staffTab!=='inventory') renderStaffModels(val); }
 
 // ═══════════════════════════════════════════════
 // INVENTORY
 // ═══════════════════════════════════════════════
 function renderInventoryGrid(gridId, countId, isAdmin) {
-  const count = document.getElementById(countId);
-  if (count) count.textContent = inventoryData.length+' items';
-  const grid = document.getElementById(gridId);
+  const count=document.getElementById(countId);
+  if (count) count.textContent=inventoryData.length+' items';
+  const grid=document.getElementById(gridId);
   if (!grid) return;
   grid.innerHTML = inventoryData.length
     ? inventoryData.map(item=>`
         <div class="inv-card">
-          ${item.photo_url
-            ? `<div class="inv-card-photo"><img src="${item.photo_url}" alt=""/></div>`
-            : `<div class="inv-card-no-photo">👕</div>`}
-          <div class="inv-card-name">${item.name||item.category||'Unnamed item'}</div>
+          ${item.photo_url?`<div class="inv-card-photo"><img src="${item.photo_url}"/></div>`:`<div class="inv-card-no-photo">👕</div>`}
+          <div class="inv-card-name">${item.name||item.category||'Unnamed'}</div>
           <div class="inv-card-meta">${item.category}${item.size_qty?' · '+item.size_qty:''}</div>
-          ${item.assigned_model
-            ? `<div class="inv-assigned">→ ${item.assigned_model}</div>`
-            : `<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
-          ${isAdmin?`
-          <div style="margin-top:10px">
-            <div class="select-wrap">
-              <select style="font-size:11px;padding:6px 28px 6px 10px" onchange="reassignInventory('${item.id}',this.value)">
-                <option value="">Reassign…</option>
-                ${allModels.map(m=>`<option value="${m.full_name}"${item.assigned_model===m.full_name?' selected':''}>${m.full_name}</option>`).join('')}
-              </select>
-            </div>
-          </div>`:''}
+          ${item.assigned_model?`<div class="inv-assigned">→ ${item.assigned_model}</div>`:`<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
         </div>`).join('')
     : `<div class="loading-center" style="background:var(--white);grid-column:1/-1;padding:40px;border-radius:var(--radius)">No items yet</div>`;
 }
 
-async function reassignInventory(id, modelName) {
-  await sb.from('inventory').update({assigned_model:modelName}).eq('id',id);
-  await loadInventory();
-  renderInventoryGrid('inv-grid','inv-count',true);
-  toast('Assigned ✓');
-}
-
 function openInvModal() {
-  // Reset form
-  document.getElementById('inv-name').value   = '';
-  document.getElementById('inv-size').value   = '';
-  document.getElementById('inv-photo-preview').innerHTML = `
+  document.getElementById('inv-name').value='';
+  document.getElementById('inv-size').value='';
+  document.getElementById('inv-photo-preview').innerHTML=`
     <input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
-    <div id="inv-photo-placeholder">
-      <div style="font-size:28px;margin-bottom:6px">👕</div>
-      <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div>
-    </div>`;
-
-  const sel = document.getElementById('inv-model-assign');
-  sel.innerHTML = '<option value="">Unassigned</option>';
-
-  // Models can only assign to themselves
+    <div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div></div>`;
+  const sel=document.getElementById('inv-model-assign');
+  sel.innerHTML='<option value="">Unassigned</option>';
   if (currentUser?.role==='MODEL') {
-    sel.innerHTML += `<option value="${currentUser.name}" selected>${currentUser.name} (me)</option>`;
-    sel.disabled = true;
+    sel.innerHTML+=`<option value="${currentUser.name}" selected>${currentUser.name} (me)</option>`;
+    sel.disabled=true;
   } else {
-    sel.disabled = false;
-    allModels.forEach(m => { sel.innerHTML += `<option value="${m.full_name}">${m.full_name}</option>`; });
+    sel.disabled=false;
+    allModels.forEach(m=>{ sel.innerHTML+=`<option value="${m.full_name}">${m.full_name}</option>`; });
   }
-
   document.getElementById('inv-modal-overlay').classList.remove('hidden');
 }
-
-function closeInvModal(e) {
-  if (e.target.id==='inv-modal-overlay') document.getElementById('inv-modal-overlay').classList.add('hidden');
-}
+function closeInvModal(e) { if (e.target.id==='inv-modal-overlay') document.getElementById('inv-modal-overlay').classList.add('hidden'); }
 
 async function saveInvItem() {
-  const nameVal    = document.getElementById('inv-name').value.trim();
-  const sizeVal    = document.getElementById('inv-size').value.trim();
-  const catVal     = document.getElementById('inv-cat').value;
-  const assignVal  = document.getElementById('inv-model-assign').value;
-  const photoInput = document.getElementById('inv-photo-input');
-
-  let photoUrl = '';
+  const nameVal=document.getElementById('inv-name').value.trim();
+  const sizeVal=document.getElementById('inv-size').value.trim();
+  const catVal=document.getElementById('inv-cat').value;
+  const assignVal=document.getElementById('inv-model-assign').value;
+  const photoInput=document.getElementById('inv-photo-input');
+  let photoUrl='';
   if (photoInput && photoInput.files[0]) {
-    const file = photoInput.files[0];
-    const path = `inventory/${Date.now()}_${file.name}`;
-    const { error:upErr } = await sb.storage.from('model-photos').upload(path, file, {upsert:true});
-    if (!upErr) {
-      const { data } = sb.storage.from('model-photos').getPublicUrl(path);
-      photoUrl = data.publicUrl;
-    }
+    const u=await uploadFiles([photoInput.files[0]],'inventory','items');
+    if (u.length) photoUrl=u[0];
   }
-
-  if (!nameVal && !photoUrl) { toast('Add a photo or name', true); return; }
-
-  const item = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal, photo_url:photoUrl };
-  const { error } = await sb.from('inventory').insert(item);
-  if (error) { toast('Error: '+error.message, true); return; }
+  if (!nameVal && !photoUrl) { toast('Add a photo or name',true); return; }
+  const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl});
+  if (error) { toast('Error: '+error.message,true); return; }
   toast('Item added ✓');
   document.getElementById('inv-modal-overlay').classList.add('hidden');
   await loadInventory();
-
-  // Re-render whichever grid is visible
-  if (document.getElementById('inventory-tab-content') && !document.getElementById('inventory-tab-content').classList.contains('hidden')) {
-    renderInventoryGrid('inv-grid','inv-count',true);
-  }
-  if (document.getElementById('staff-inventory-content') && !document.getElementById('staff-inventory-content').classList.contains('hidden')) {
-    renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
-  }
+  if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
 }
 
 // ═══════════════════════════════════════════════
@@ -850,18 +802,14 @@ async function showModelDashboard(model) {
   hideAll();
   document.getElementById('model-dashboard').classList.remove('hidden');
   await loadInventory();
-  const modelInv = inventoryData.filter(i=>i.assigned_model===model.full_name);
-  const flag    = getFlag(model.ethnicity);
-  const initials= (model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const photos  = model.photos      || [];
-  const hairPh  = model.hair_photos || [];
-  const muaPh   = model.mua_photos  || [];
+  const modelInv=inventoryData.filter(i=>i.assigned_model===model.full_name);
+  const flag=getFlag(model.ethnicity);
+  const initials=(model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const photos=model.photos||[]; const hairPh=model.hair_photos||[]; const muaPh=model.mua_photos||[];
 
   document.getElementById('model-profile-wrap').innerHTML = `
     <div class="model-profile-hero">
-      <div class="model-hero-avatar">
-        ${model.profile_photo?`<img src="${model.profile_photo}"/>`:initials}
-      </div>
+      <div class="model-hero-avatar">${model.profile_photo?`<img src="${model.profile_photo}"/>`:initials}</div>
       <div>
         <div class="model-hero-name">${model.full_name||'—'}</div>
         <div class="model-hero-handle">${model.instagram?'@'+model.instagram:''}</div>
@@ -871,18 +819,7 @@ async function showModelDashboard(model) {
         </div>
       </div>
     </div>
-
     <div class="model-profile-body">
-
-      <div class="model-section">
-        <div class="model-section-title">Event Checklist</div>
-        <div class="checklist">
-          <div class="check-item${model.checklist_outfit?' checked':''}"><span>${model.checklist_outfit?'✓':'○'}</span> Outfit Confirmed</div>
-          <div class="check-item${model.checklist_hair?' checked':''}"><span>${model.checklist_hair?'✓':'○'}</span> Hair Done</div>
-          <div class="check-item${model.checklist_makeup?' checked':''}"><span>${model.checklist_makeup?'✓':'○'}</span> Makeup Done</div>
-        </div>
-      </div>
-
       <div class="model-section">
         <div class="model-section-title">Your Details</div>
         <div class="detail-grid">
@@ -894,7 +831,6 @@ async function showModelDashboard(model) {
           <div class="detail-item"><label>Cultural Piece</label><div class="val">${model.cultural_piece?model.cultural_desc:'None'}</div></div>
         </div>
       </div>
-
       ${model.assigned_stylist||model.assigned_hair||model.assigned_makeup?`
       <div class="model-section">
         <div class="model-section-title">Your Team</div>
@@ -904,105 +840,65 @@ async function showModelDashboard(model) {
           ${model.assigned_makeup?`<div class="model-team-card"><div class="model-team-label">Makeup</div><div class="model-team-name">${model.assigned_makeup}</div></div>`:''}
         </div>
       </div>`:''}
-
       ${model.notes?`<div class="model-section"><div class="model-section-title">Notes from Team</div><div style="font-size:14px">${model.notes}</div></div>`:''}
-
-      ${modelInv.length?`
+      ${modelInv.length?`<div class="model-section"><div class="model-section-title">Your Stage Fit</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
       <div class="model-section">
-        <div class="model-section-title">Your Stage Fit</div>
-        <div class="stage-fit-grid">
-          ${modelInv.map(item=>`
-            <div class="stage-fit-item">
-              ${item.photo_url?`<img src="${item.photo_url}" alt=""/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}
-              <div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div>
-            </div>`).join('')}
-        </div>
-      </div>`:''}
-
-      <div class="model-section">
-        <div class="model-section-title">Upload Your Photos</div>
-        <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Upload your base fit photos, hair inspo, and makeup inspo.</p>
+        <div class="model-section-title">Add More Photos</div>
+        <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Add to your base fits, hair inspo, or makeup inspo any time.</p>
         <div class="upload-grid">
-          <div>
-            <label style="margin-bottom:8px">Base Fits</label>
-            <div class="upload-zone" onclick="document.getElementById('up-fit').click()">
-              <input type="file" id="up-fit" multiple accept="image/*" onchange="uploadPhotos(this,'photos','${model.id}')"/>
-              <div class="upload-zone-icon">📸</div>
-              <div class="upload-zone-text">Tap to upload</div>
-            </div>
-          </div>
-          <div>
-            <label style="margin-bottom:8px">Hair Inspo</label>
-            <div class="upload-zone" onclick="document.getElementById('up-hair').click()">
-              <input type="file" id="up-hair" multiple accept="image/*" onchange="uploadPhotos(this,'hair_photos','${model.id}')"/>
-              <div class="upload-zone-icon">💇</div>
-              <div class="upload-zone-text">Tap to upload</div>
-            </div>
-          </div>
-          <div>
-            <label style="margin-bottom:8px">Makeup Inspo</label>
-            <div class="upload-zone" onclick="document.getElementById('up-mua').click()">
-              <input type="file" id="up-mua" multiple accept="image/*" onchange="uploadPhotos(this,'mua_photos','${model.id}')"/>
-              <div class="upload-zone-icon">💄</div>
-              <div class="upload-zone-text">Tap to upload</div>
-            </div>
-          </div>
+          <div><label style="margin-bottom:8px">Base Fits</label><div class="upload-zone" onclick="document.getElementById('up-fit').click()"><input type="file" id="up-fit" multiple accept="image/*" onchange="uploadMorePhotos(this,'photos','${model.id}')"/><div class="upload-zone-icon">📸</div><div class="upload-zone-text">Tap to upload</div></div></div>
+          <div><label style="margin-bottom:8px">Hair Inspo</label><div class="upload-zone" onclick="document.getElementById('up-hair').click()"><input type="file" id="up-hair" multiple accept="image/*" onchange="uploadMorePhotos(this,'hair_photos','${model.id}')"/><div class="upload-zone-icon">💇</div><div class="upload-zone-text">Tap to upload</div></div></div>
+          <div><label style="margin-bottom:8px">Makeup Inspo</label><div class="upload-zone" onclick="document.getElementById('up-mua').click()"><input type="file" id="up-mua" multiple accept="image/*" onchange="uploadMorePhotos(this,'mua_photos','${model.id}')"/><div class="upload-zone-icon">💄</div><div class="upload-zone-text">Tap to upload</div></div></div>
         </div>
         <div id="upload-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:12px"></div>
       </div>
-
       ${photos.length?`<div class="model-section"><div class="model-section-title">Your Fits</div><div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${hairPh.length?`<div class="model-section"><div class="model-section-title">Hair Inspo</div><div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${muaPh.length?`<div class="model-section"><div class="model-section-title">Makeup Inspo</div><div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
-
-    </div>
-  `;
+    </div>`;
 }
 
-async function uploadPhotos(input, field, modelId) {
-  const files = Array.from(input.files);
-  if (!files.length) return;
-  const status = document.getElementById('upload-status');
-  if (status) status.textContent = 'Uploading…';
-  const urls = [];
-  for (const file of files) {
-    const path = `${modelId}/${field}/${Date.now()}_${file.name}`;
-    const { error } = await sb.storage.from('model-photos').upload(path,file,{upsert:true});
-    if (!error) { const { data } = sb.storage.from('model-photos').getPublicUrl(path); urls.push(data.publicUrl); }
-  }
-  const { data:current } = await sb.from('model_profiles').select(field).eq('id',modelId).single();
-  const existing = current?.[field]||[];
+async function uploadMorePhotos(input, field, modelId) {
+  const files=Array.from(input.files); if(!files.length) return;
+  const status=document.getElementById('upload-status'); if(status) status.textContent='Uploading…';
+  const urls=await uploadFiles(files, modelId, field);
+  const { data:current }=await sb.from('model_profiles').select(field).eq('id',modelId).single();
+  const existing=current?.[field]||[];
   await sb.from('model_profiles').update({[field]:[...existing,...urls]}).eq('id',modelId);
-  if (status) status.textContent = `✓ ${urls.length} photo(s) uploaded`;
+  if (status) status.textContent=`✓ ${urls.length} uploaded`;
   toast('Photos uploaded ✓');
+  // reload model dashboard
+  const { data:fresh }=await sb.from('model_profiles').select('*').eq('id',modelId).single();
+  if (fresh) showModelDashboard(fresh);
 }
 
 // ═══════════════════════════════════════════════
-// TEAM
+// TEAM PANEL (admin)
 // ═══════════════════════════════════════════════
 function renderTeam() {
-  const staffList = [
-    {name:'Christie',role:'Hair Stylist', field:'assigned_hair'},
-    {name:'Maria',   role:'Hair Stylist', field:'assigned_hair'},
-    {name:'Neza',    role:'Hair Stylist', field:'assigned_hair'},
-    {name:'Rebecca', role:'Makeup Artist',field:'assigned_makeup'},
-    {name:'Daniel',  role:'Stylist',      field:'assigned_stylist'},
-    {name:'Dee',     role:'Stylist',      field:'assigned_stylist'},
-    {name:'Komi',    role:'Stylist',      field:'assigned_stylist'},
+  const staffList=[
+    {name:'Christie',role:'Hair Stylist',field:'assigned_hair'},
+    {name:'Maria',role:'Hair Stylist',field:'assigned_hair'},
+    {name:'Neza',role:'Hair Stylist',field:'assigned_hair'},
+    {name:'Rebecca',role:'Makeup Artist',field:'assigned_makeup'},
+    {name:'Daniel',role:'Stylist',field:'assigned_stylist'},
+    {name:'Dee',role:'Stylist',field:'assigned_stylist'},
+    {name:'Komi',role:'Stylist',field:'assigned_stylist'},
+    {name:'Richelle',role:'Stylist',field:'assigned_stylist'},
   ];
-  const grid = document.getElementById('team-grid');
-  grid.innerHTML = staffList.map(s=>{
-    const assigned = allModels.filter(m=>m[s.field]===s.name);
-    return `<div class="team-card">
-      <div class="team-card-name">${s.name}</div>
-      <div class="team-card-role">${s.role} · ${assigned.length} assigned</div>
-      <div class="team-assigned-list">
-        ${assigned.length
-          ? assigned.map(m=>`<div class="team-assigned-item">${getFlag(m.ethnicity)} ${m.full_name}</div>`).join('')
-          : '<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">None assigned</div>'}
-      </div>
-    </div>`;
+  const grid=document.getElementById('team-grid');
+  grid.innerHTML=staffList.map(s=>{
+    const assigned=allModels.filter(m=>m[s.field]===s.name);
+    return `<div class="team-card"><div class="team-card-name">${s.name}</div><div class="team-card-role">${s.role} · ${assigned.length} assigned</div><div class="team-assigned-list">${assigned.length?assigned.map(m=>`<div class="team-assigned-item">${getFlag(m.ethnicity)} ${m.full_name}</div>`).join(''):'<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">None assigned</div>'}</div></div>`;
   }).join('');
+}
+
+// ═══════════════════════════════════════════════
+// REFRESH WHATEVER VIEW IS OPEN
+// ═══════════════════════════════════════════════
+function refreshCurrentView() {
+  if (currentUser?.role==='ADMIN') renderAdminModels(document.getElementById('model-search')?.value||'');
+  else if (currentUser?.role) renderStaffModels();
 }
 
 // ═══════════════════════════════════════════════
@@ -1012,13 +908,6 @@ function hideAll() {
   document.getElementById('auth-screen').classList.add('hidden');
   document.querySelectorAll('.dashboard').forEach(d=>d.classList.add('hidden'));
 }
-function showError(id, msg) { const el=document.getElementById(id); if(el) el.textContent=msg; }
-
+function showError(id,msg){ const el=document.getElementById(id); if(el) el.textContent=msg; }
 let toastTimer;
-function toast(msg, isError) {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'show'+(isError?' error':'');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(()=>{el.className='';},3000);
-}
+function toast(msg,isError){ const el=document.getElementById('toast'); el.textContent=msg; el.className='show'+(isError?' error':''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>{el.className='';},3000); }
