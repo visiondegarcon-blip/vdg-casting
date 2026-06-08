@@ -384,6 +384,7 @@ async function setAdminTab(btn, tab) {
   } else {
     modelsContent.classList.remove('hidden');
     invContent.classList.add('hidden');
+    await loadAllModels(); // always refresh model list when switching tabs
     renderAdminModels(document.getElementById('model-search')?.value||'');
   }
 }
@@ -669,18 +670,18 @@ async function openModelPanel(id) {
       <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
     </div>` : '';
 
-  // ── ORDER per role. Photos are in collapsible buttons. Each role's most relevant button comes first. ──
+  // ── ORDER per role — photo buttons ALWAYS first ──
   let body = '';
   if (statusHTML) body += statusHTML;
 
   if (role === 'HAIR_STYLIST') {
-    body += hairMuaSection + noteBlock + faceSection + outfitSection + detailsBlock;
+    body += hairMuaSection + faceSection + outfitSection + noteBlock + detailsBlock;
   } else if (role === 'MAKEUP_ARTIST') {
-    body += hairMuaSection + noteBlock + faceSection + outfitSection + detailsBlock;
+    body += hairMuaSection + faceSection + outfitSection + noteBlock + detailsBlock;
   } else if (role === 'STYLIST') {
-    body += outfitSection + noteBlock + faceSection + hairMuaSection + detailsBlock;
+    body += outfitSection + faceSection + hairMuaSection + noteBlock + detailsBlock;
   } else { // ADMIN
-    body += detailsBlock + adminBlock + faceSection + outfitSection + hairMuaSection + (m.model_note?noteBlock:'');
+    body += faceSection + outfitSection + hairMuaSection + (m.model_note?noteBlock:'') + detailsBlock + adminBlock;
   }
 
   document.getElementById('panel-body').innerHTML = body;
@@ -797,13 +798,84 @@ function renderInventoryGrid(gridId, countId, isAdmin) {
   if (!grid) return;
   grid.innerHTML = inventoryData.length
     ? inventoryData.map(item=>`
-        <div class="inv-card">
-          ${item.photo_url?`<div class="inv-card-photo"><img src="${item.photo_url}"/></div>`:`<div class="inv-card-no-photo">👕</div>`}
+        <div class="inv-card" onclick="openInventoryPanel('${item.id}')" style="cursor:pointer">
+          ${item.photo_url
+            ? `<div class="inv-card-photo"><img src="${item.photo_url}" onerror="this.parentElement.innerHTML='👕'" alt=""/></div>`
+            : `<div class="inv-card-no-photo">👕</div>`}
           <div class="inv-card-name">${item.name||item.category||'Unnamed'}</div>
-          <div class="inv-card-meta">${item.category}${item.size_qty?' · '+item.size_qty:''}</div>
-          ${item.assigned_model?`<div class="inv-assigned">→ ${item.assigned_model}</div>`:`<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
+          <div class="inv-card-meta">${item.category||''}${item.size_qty?' · '+item.size_qty:''}</div>
+          ${item.assigned_model
+            ? `<div class="inv-assigned">→ ${item.assigned_model}</div>`
+            : `<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
         </div>`).join('')
     : `<div class="loading-center" style="background:var(--white);grid-column:1/-1;padding:40px;border-radius:var(--radius)">No items yet</div>`;
+}
+
+function openInventoryPanel(itemId) {
+  const item = inventoryData.find(x=>String(x.id)===String(itemId));
+  if (!item) { toast('Item not found',true); return; }
+
+  // Reset and pre-fill the modal with existing item data
+  document.getElementById('inv-name').value  = item.name||'';
+  document.getElementById('inv-size').value  = item.size_qty||'';
+  document.getElementById('inv-cat').value   = item.category||'Top';
+
+  // Show existing photo
+  const preview = document.getElementById('inv-photo-preview');
+  if (item.photo_url) {
+    preview.innerHTML = `<img src="${item.photo_url}" alt="" style="width:100%;height:100%;object-fit:cover"/>`;
+  } else {
+    preview.innerHTML = `<input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
+      <div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div></div>`;
+  }
+
+  // Pre-select assigned model
+  const sel = document.getElementById('inv-model-assign');
+  sel.innerHTML = '<option value="">Unassigned</option>';
+  if (currentUser?.role==='MODEL') {
+    sel.innerHTML += `<option value="${currentUser.name}">${currentUser.name} (me)</option>`;
+    sel.disabled = true;
+  } else {
+    sel.disabled = false;
+    allModels.forEach(m=>{ sel.innerHTML+=`<option value="${m.full_name}"${item.assigned_model===m.full_name?' selected':''}>${m.full_name}</option>`; });
+  }
+
+  // Override save to UPDATE instead of INSERT
+  const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
+  if (saveBtn) {
+    saveBtn.textContent = 'Save Changes';
+    saveBtn.onclick = () => updateInvItem(item.id);
+  }
+
+  document.getElementById('inv-modal-overlay').classList.remove('hidden');
+}
+
+async function updateInvItem(itemId) {
+  const nameVal   = document.getElementById('inv-name').value.trim();
+  const sizeVal   = document.getElementById('inv-size').value.trim();
+  const catVal    = document.getElementById('inv-cat').value;
+  const assignVal = document.getElementById('inv-model-assign').value;
+
+  const updates = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal };
+
+  const photoInput = document.getElementById('inv-photo-input');
+  if (photoInput && photoInput.files[0]) {
+    const u = await uploadFiles([photoInput.files[0]],'inventory','items',1);
+    if (u.length) updates.photo_url = u[0];
+  }
+
+  const { error } = await sb.from('inventory').update(updates).eq('id',itemId);
+  if (error) { toast('Error: '+error.message,true); return; }
+  toast('Saved ✓');
+  document.getElementById('inv-modal-overlay').classList.add('hidden');
+
+  // reset save button back to "Add Item" for next new item
+  const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
+  if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
+
+  await loadInventory();
+  if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
 }
 
 function openInvModal() {
@@ -812,6 +884,9 @@ function openInvModal() {
   document.getElementById('inv-photo-preview').innerHTML=`
     <input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
     <div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div></div>`;
+  // Reset save button to Add mode
+  const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
+  if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
   const sel=document.getElementById('inv-model-assign');
   sel.innerHTML='<option value="">Unassigned</option>';
   if (currentUser?.role==='MODEL') {
@@ -851,12 +926,17 @@ async function saveInvItem() {
 // ═══════════════════════════════════════════════
 async function showModelDashboard(model) {
   hideAll();
+  const wrap = document.getElementById('model-profile-wrap');
+  if (!wrap) return;
   document.getElementById('model-dashboard').classList.remove('hidden');
   await loadInventory();
-  const modelInv=inventoryData.filter(i=>i.assigned_model===model.full_name);
-  const flag=getFlag(model.ethnicity);
-  const initials=(model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const photos=model.photos||[]; const hairPh=model.hair_photos||[]; const muaPh=model.mua_photos||[];
+  const modelInv  = inventoryData.filter(i=>i.assigned_model===model.full_name);
+  const flag      = getFlag(model.ethnicity);
+  const initials  = (model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const photos    = model.photos        || [];
+  const hairPh    = model.hair_photos   || [];
+  const muaPh     = model.mua_photos    || [];
+  const outfitPh  = model.outfit_photos || [];
 
   document.getElementById('model-profile-wrap').innerHTML = `
     <div class="model-profile-hero">
