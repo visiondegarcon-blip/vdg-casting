@@ -135,27 +135,35 @@
                   <input type="file" id="ex-face" accept="image/*"/>
                 </div>
                 <div class="form-group">
-                  <label>Base Fit Photos</label>
+                  <label>Base Fit Photos <span style="color:var(--dim)">(up to 3)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-fit').click()">
-                    <input type="file" id="ex-fit" multiple accept="image/*" onchange="markUploaded('ex-fit','ex-fit-status')"/>
+                    <input type="file" id="ex-fit" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-fit','ex-fit-status')"/>
                     <div class="upload-zone-icon">📸</div>
                     <div class="upload-zone-text" id="ex-fit-status">Tap to add base fits</div>
                   </div>
                 </div>
                 <div class="form-group">
-                  <label>Hair Inspo Photos</label>
+                  <label>Hair Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-hair').click()">
-                    <input type="file" id="ex-hair" multiple accept="image/*" onchange="markUploaded('ex-hair','ex-hair-status')"/>
+                    <input type="file" id="ex-hair" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-hair','ex-hair-status')"/>
                     <div class="upload-zone-icon">💇</div>
                     <div class="upload-zone-text" id="ex-hair-status">Tap to add hair inspo</div>
                   </div>
                 </div>
                 <div class="form-group">
-                  <label>Makeup Inspo Photos</label>
+                  <label>Makeup Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-mua').click()">
-                    <input type="file" id="ex-mua" multiple accept="image/*" onchange="markUploaded('ex-mua','ex-mua-status')"/>
+                    <input type="file" id="ex-mua" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-mua','ex-mua-status')"/>
                     <div class="upload-zone-icon">💄</div>
                     <div class="upload-zone-text" id="ex-mua-status">Tap to add makeup inspo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Your Own Outfit Photos <span style="color:var(--dim)">(optional, up to 3)</span></label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-outfit').click()">
+                    <input type="file" id="ex-outfit" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-outfit','ex-outfit-status')"/>
+                    <div class="upload-zone-icon">👕</div>
+                    <div class="upload-zone-text" id="ex-outfit-status">Tap to add your own fits</div>
                   </div>
                 </div>
                 <div class="form-group">
@@ -278,9 +286,10 @@
               <div class="form-group">
                 <label>Do you have a cultural piece to bring?</label>
                 <div class="select-wrap">
-                  <select id="new-cultural">
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
+                  <select id="new-cultural" onchange="document.getElementById('new-cultural-desc-group').style.display = this.value==='no'?'none':'block'">
+                    <option value="no">No</option>
+                    <option value="have">Yes, I have access to one</option>
+                    <option value="try">I can try to get one</option>
                   </select>
                 </div>
               </div>
@@ -311,7 +320,7 @@
                 </div>
               </div>
               <div class="form-group">
-                <label>Hair change OK?</label>
+                <label>Are you open to working with the hairstylist to change your hair for the event?</label>
                 <div class="select-wrap">
                   <select id="new-hair-ok">
                     <option value="true">Yes</option>
@@ -342,16 +351,20 @@
                 <input type="file" id="new-face1" accept="image/*"/>
               </div>
               <div class="form-group">
-                <label>Base Fit Photos</label>
-                <input type="file" id="new-fit" multiple accept="image/*"/>
+                <label>Base Fit Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <input type="file" id="new-fit" multiple accept="image/*" onchange="limitFiles(this,3)"/>
               </div>
               <div class="form-group">
-                <label>Hair Inspo Photos</label>
-                <input type="file" id="new-hair-photos" multiple accept="image/*"/>
+                <label>Hair Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <input type="file" id="new-hair-photos" multiple accept="image/*" onchange="limitFiles(this,3)"/>
               </div>
               <div class="form-group">
-                <label>Makeup Inspo Photos</label>
-                <input type="file" id="new-mua-photos" multiple accept="image/*"/>
+                <label>Makeup Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <input type="file" id="new-mua-photos" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+              </div>
+              <div class="form-group">
+                <label>Your Own Outfit Photos <span style="color:var(--dim)">(optional, up to 3)</span></label>
+                <input type="file" id="new-outfit" multiple accept="image/*" onchange="limitFiles(this,3)"/>
               </div>
               <div class="form-group">
                 <label>Notes (optional)</label>
@@ -375,7 +388,7 @@
           <!-- CREDENTIALS (shared) -->
           <div id="signup-credentials-group" class="hidden">
             <div class="form-group">
-              <label>Choose a Username</label>
+              <label>Choose your username for the app</label>
               <input type="text" id="signup-username" placeholder="e.g. jordan.sullivan" autocapitalize="none" autocorrect="off"/>
             </div>
             <div class="form-group">
@@ -466,7 +479,7 @@
         <div class="tab-nav">
           <button class="tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
           <button class="tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
-          <button class="tab-btn" onclick="setStaffTab(this,'inventory')">Inventory</button>
+          <button class="tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>
         </div>
         <div id="staff-models-content">
           <div class="model-grid" id="staff-model-grid"></div>
