@@ -33,6 +33,15 @@ function toArr(v) {
   return [];
 }
 
+// Supabase sometimes returns array-type Postgres columns as JSON-encoded strings — normalize to a real array
+function toArr(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v.trim().startsWith('[')) {
+    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
+
 // Map role → which status/assignment fields it controls
 const ROLE_FIELDS = {
   STYLIST:       { status: 'stylist_status', assign: 'assigned_stylist', label: 'Stylist',       hasPending: false },
@@ -559,11 +568,11 @@ async function openModelPanel(id) {
   const role    = currentUser?.role;
   const isAdmin = role==='ADMIN';
   const isHairOrMua = role==='HAIR_STYLIST' || role==='MAKEUP_ARTIST';
-  const photos  = m.photos      || [];
-  const hairPh  = m.hair_photos || [];
-  const muaPh   = m.mua_photos  || [];
-  const facePh  = m.face_photos || [];
-  const tags    = m.tags        || [];
+  const photos  = toArr(m.photos);
+  const hairPh  = toArr(m.hair_photos);
+  const muaPh   = toArr(m.mua_photos);
+  const facePh  = toArr(m.face_photos);
+  const tags    = toArr(m.tags);
   const modelInv = inventoryData.filter(i=>i.assigned_model===m.full_name);
 
   // ── Status action buttons (staff only) ──
@@ -585,7 +594,7 @@ async function openModelPanel(id) {
   }
 
   // ── Collapsible photo sections (Face / Hair+Makeup / Outfit) ──
-  const outfitPh = m.outfit_photos || [];
+  const outfitPh = toArr(m.outfit_photos);
   const photoGrid = (arr) => arr.length ? `<div class="photo-grid">${arr.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>` : '<div class="no-photos">None uploaded</div>';
 
   const faceSection = `
@@ -940,10 +949,10 @@ async function showModelDashboard(model) {
   const modelInv  = inventoryData.filter(i=>i.assigned_model===model.full_name);
   const flag      = getFlag(model.ethnicity);
   const initials  = (model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const photos    = model.photos        || [];
-  const hairPh    = model.hair_photos   || [];
-  const muaPh     = model.mua_photos    || [];
-  const outfitPh  = model.outfit_photos || [];
+  const photos    = toArr(model.photos);
+  const hairPh    = toArr(model.hair_photos);
+  const muaPh     = toArr(model.mua_photos);
+  const outfitPh  = toArr(model.outfit_photos);
 
   document.getElementById('model-profile-wrap').innerHTML = `
     <div class="model-profile-hero">
@@ -991,7 +1000,7 @@ async function showModelDashboard(model) {
         </div>
         <div id="upload-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:12px"></div>
       </div>
-      ${(model.outfit_photos&&model.outfit_photos.length)?`<div class="model-section"><div class="model-section-title">Your Own Outfit</div><div class="photo-grid">${model.outfit_photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
+      ${outfitPh.length?`<div class="model-section"><div class="model-section-title">Your Own Outfit</div><div class="photo-grid">${outfitPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${photos.length?`<div class="model-section"><div class="model-section-title">Your Fits</div><div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${hairPh.length?`<div class="model-section"><div class="model-section-title">Hair Inspo</div><div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${muaPh.length?`<div class="model-section"><div class="model-section-title">Makeup Inspo</div><div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
