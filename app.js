@@ -25,6 +25,13 @@ const FLAG_MAP = {
   "Middle Eastern":"🌍","South Asian":"🌏","Polynesian / Pacific Islands":"🌊","Other":"🌍"
 };
 function getFlag(eth) { return FLAG_MAP[eth] || "🌍"; }
+function toArr(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v.trim().startsWith('[')) {
+    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
 
 // Map role → which status/assignment fields it controls
 const ROLE_FIELDS = {
