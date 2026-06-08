@@ -11,7 +11,13 @@ const STAFF_NAMES = {
   MAKEUP_ARTIST: ["Rebecca"],
   ADMIN:         ["Daniel"]
 };
-
+function toArr(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v.trim().startsWith('[')) {
+    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
 const FLAG_MAP = {
   "Australian":"🇦🇺","Burundian":"🇧🇮","Cameroonian":"🇨🇲","Chinese":"🇨🇳",
   "Congolese":"🇨🇩","Ethiopian":"🇪🇹","Filipino":"🇵🇭","Ghanaian":"🇬🇭",
@@ -596,11 +602,11 @@ async function openModelPanel(id) {
   const role    = currentUser?.role;
   const isAdmin = role==='ADMIN';
   const isHairOrMua = role==='HAIR_STYLIST' || role==='MAKEUP_ARTIST';
-  const photos  = m.photos      || [];
-  const hairPh  = m.hair_photos || [];
-  const muaPh   = m.mua_photos  || [];
-  const facePh  = m.face_photos || [];
-  const tags    = m.tags        || [];
+    const photos  = toArr(m.photos);
+  const hairPh  = toArr(m.hair_photos);
+  const muaPh   = toArr(m.mua_photos);
+  const facePh  = toArr(m.face_photos);
+  const tags    = toArr(m.tags);
   const modelInv = inventoryData.filter(i=>i.assigned_model===m.full_name);
 
   // ── Status action buttons (staff only) ──
@@ -622,7 +628,7 @@ async function openModelPanel(id) {
   }
 
   // ── Collapsible photo sections (Face / Hair+Makeup / Outfit) ──
-  const outfitPh = m.outfit_photos || [];
+    const outfitPh = toArr(m.outfit_photos);
   const photoGrid = (arr) => arr.length ? `<div class="photo-grid">${arr.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>` : '<div class="no-photos">None uploaded</div>';
 
   const faceSection = `
@@ -978,9 +984,9 @@ async function showModelDashboard(model) {
   const flag      = getFlag(model.ethnicity);
   const initials  = (model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const photos    = model.photos        || [];
-  const hairPh    = model.hair_photos   || [];
-  const muaPh     = model.mua_photos    || [];
-  const outfitPh  = model.outfit_photos || [];
+    const hairPh    = toArr(model.hair_photos);
+  const muaPh     = toArr(model.mua_photos);
+  const outfitPh  = toArr(model.outfit_photos);
 
   // FIX: wrap in try/catch so any render error shows a message instead of blank page
   try {
