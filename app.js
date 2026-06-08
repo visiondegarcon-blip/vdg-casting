@@ -58,6 +58,7 @@ let staffTab      = 'all';
 let openModelData = null;
 let isNewModel    = false;
 let isNewStaff    = false;
+let staffUsers    = [];
 
 // ═══════════════════════════════════════════════
 // AUTH TABS
@@ -401,6 +402,13 @@ async function loadInventory() {
   const { data } = await sb.from('inventory').select('*').order('created_at',{ascending:false});
   inventoryData = data || [];
 }
+async function loadStaffUsers() {
+  const { data } = await sb.from('users').select('name,role,instagram').neq('role','ADMIN').order('name');
+  staffUsers = data || [];
+}
+function staffNamesFor(role) {
+  return staffUsers.filter(s=>s.role===role).map(s=>s.name);
+}
 
 // ═══════════════════════════════════════════════
 // ADMIN DASHBOARD
@@ -411,6 +419,7 @@ async function showAdminDashboard() {
   document.getElementById('admin-name-display').textContent = currentUser.name;
   await loadAllModels();
   await loadInventory();
+  await loadStaffUsers();
   renderAdminModels();
 }
 
@@ -483,15 +492,15 @@ function modelCardHTML(m, viewerRole) {
     <div class="card-footer">
       <select class="assign-select" onchange="assignField('${m.id}','assigned_stylist',this.value);event.stopPropagation()">
         <option value="">Stylist…</option>
-        ${STAFF_NAMES.STYLIST.map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}
+        ${staffNamesFor('STYLIST').map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}
       </select>
       <select class="assign-select" onchange="assignField('${m.id}','assigned_hair',this.value);event.stopPropagation()">
         <option value="">Hair…</option>
-        ${STAFF_NAMES.HAIR_STYLIST.map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}
+        ${staffNamesFor('HAIR_STYLIST').map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}
       </select>
       <select class="assign-select" onchange="assignField('${m.id}','assigned_makeup',this.value);event.stopPropagation()">
         <option value="">MUA…</option>
-        ${STAFF_NAMES.MAKEUP_ARTIST.map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}
+        ${staffNamesFor('MAKEUP_ARTIST').map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}
       </select>
       <button class="btn-approve${m.approved?' btn-approved':''}" onclick="toggleApprove('${m.id}');event.stopPropagation()">${m.approved?'✓ Approved':'Approve'}</button>
     </div>` : '';
@@ -693,9 +702,9 @@ async function openModelPanel(id) {
     <div>
       <div class="panel-section-title">Assignment & Status</div>
       <div class="assign-grid">
-        <div class="form-group" style="margin-bottom:0"><label>Stylist</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_stylist',this.value)"><option value="">Unassigned</option>${STAFF_NAMES.STYLIST.map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
-        <div class="form-group" style="margin-bottom:0"><label>Hair</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_hair',this.value)"><option value="">Unassigned</option>${STAFF_NAMES.HAIR_STYLIST.map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
-        <div class="form-group" style="margin-bottom:0"><label>MUA</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_makeup',this.value)"><option value="">Unassigned</option>${STAFF_NAMES.MAKEUP_ARTIST.map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
+        <div class="form-group" style="margin-bottom:0"><label>Stylist</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_stylist',this.value)"><option value="">Unassigned</option>${staffNamesFor('STYLIST').map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
+        <div class="form-group" style="margin-bottom:0"><label>Hair</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_hair',this.value)"><option value="">Unassigned</option>${staffNamesFor('HAIR_STYLIST').map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
+        <div class="form-group" style="margin-bottom:0"><label>MUA</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_makeup',this.value)"><option value="">Unassigned</option>${staffNamesFor('MAKEUP_ARTIST').map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
         <div class="form-group" style="margin-bottom:0"><label>Approval</label><button class="btn btn-sm ${m.approved?'btn-brown':'btn-ghost'}" onclick="toggleApprove('${m.id}');openModelPanel('${m.id}')">${m.approved?'✓ Approved':'Approve'}</button></div>
       </div>
     </div>
@@ -723,6 +732,10 @@ async function openModelPanel(id) {
     <div>
       <div class="panel-section-title">Internal Notes</div>
       <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
+    </div>
+    <div>
+      <button class="btn btn-sm btn-ghost" onclick="resetModelPin('${m.id}','${(m.full_name||'').replace(/'/g,"\\'")}')">🔑 Reset PIN</button>
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Generates a new 4-digit PIN for this model — give it to them so they can log back in.</div>
     </div>
     <div>
       <button class="btn btn-sm" style="background:var(--white);border:1.5px solid var(--red);color:var(--red)" onclick="deleteModel('${m.id}','${(m.full_name||'').replace(/'/g,"\\'")}')">🗑 Delete Model</button>
@@ -805,6 +818,45 @@ async function deleteModel(id, name) {
   closePanel();
   refreshCurrentView();
   toast(`${(name||'Model').split(' ')[0]} deleted`);
+}
+
+async function resetModelPin(id, name) {
+  if (!confirm(`Generate a new PIN for ${name||'this model'}? Their old PIN will stop working.`)) return;
+  const newPin = String(Math.floor(1000 + Math.random()*9000));
+  const { error } = await sb.from('model_profiles').update({ pin: newPin }).eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  const m = allModels.find(x=>String(x.id)===String(id));
+  if (m) m.pin = newPin;
+  if (openModelData && String(openModelData.id)===String(id)) openModelData.pin = newPin;
+  alert(`New PIN for ${name||'this model'}: ${newPin}\n\nGive this to them so they can log back in.`);
+  toast(`PIN reset for ${(name||'model').split(' ')[0]}`);
+}
+
+function csvEscape(v) {
+  const s = (v===null||v===undefined) ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+}
+function exportModelsCSV() {
+  if (!allModels.length) { toast('No models to export', true); return; }
+  const cols = [
+    ['full_name','Name'],['phone','Phone'],['instagram','Instagram'],['ethnicity','Ethnicity'],
+    ['assigned_stylist','Stylist'],['assigned_hair','Hair'],['assigned_makeup','Makeup'],
+    ['approved','Approved'],['checklist_outfit','Outfit Done'],['checklist_hair','Hair Done'],['checklist_makeup','Makeup Done'],
+    ['notes','Notes']
+  ];
+  const header = cols.map(c=>c[1]).join(',');
+  const rows = allModels.map(m => cols.map(c=>csvEscape(m[c[0]])).join(','));
+  const csv = [header, ...rows].join('\n');
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vdg-models-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  toast('Model roster exported');
 }
 
 // ═══════════════════════════════════════════════
@@ -1079,17 +1131,12 @@ async function uploadMorePhotos(input, field, modelId) {
 // ═══════════════════════════════════════════════
 // TEAM PANEL (admin)
 // ═══════════════════════════════════════════════
+const ROLE_LABELS = { STYLIST:'Stylist', HAIR_STYLIST:'Hair Stylist', MAKEUP_ARTIST:'Makeup Artist' };
+const ROLE_FIELD_MAP = { STYLIST:'assigned_stylist', HAIR_STYLIST:'assigned_hair', MAKEUP_ARTIST:'assigned_makeup' };
 function renderTeam() {
-  const staffList=[
-    {name:'Christie',role:'Hair Stylist',field:'assigned_hair'},
-    {name:'Maria',role:'Hair Stylist',field:'assigned_hair'},
-    {name:'Neza',role:'Hair Stylist',field:'assigned_hair'},
-    {name:'Rebecca',role:'Makeup Artist',field:'assigned_makeup'},
-    {name:'Daniel',role:'Stylist',field:'assigned_stylist'},
-    {name:'Dee',role:'Stylist',field:'assigned_stylist'},
-    {name:'Komi',role:'Stylist',field:'assigned_stylist'},
-    {name:'Richelle',role:'Stylist',field:'assigned_stylist'},
-  ];
+  const staffList = staffUsers
+    .filter(s=>ROLE_LABELS[s.role])
+    .map(s=>({ name:s.name, role:ROLE_LABELS[s.role], field:ROLE_FIELD_MAP[s.role] }));
   const grid=document.getElementById('team-grid');
   grid.innerHTML=staffList.map(s=>{
     const assigned=allModels.filter(m=>m[s.field]===s.name);
