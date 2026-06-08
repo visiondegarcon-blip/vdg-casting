@@ -723,6 +723,10 @@ async function openModelPanel(id) {
     <div>
       <div class="panel-section-title">Internal Notes</div>
       <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
+    </div>
+    <div>
+      <button class="btn btn-sm" style="background:var(--white);border:1.5px solid var(--red);color:var(--red)" onclick="deleteModel('${m.id}','${(m.full_name||'').replace(/'/g,"\\'")}')">🗑 Delete Model</button>
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Permanently removes this model's profile and all uploaded photos. Cannot be undone.</div>
     </div>` : '';
 
   // ── ORDER per role — photo buttons ALWAYS first ──
@@ -783,6 +787,23 @@ async function saveNotes() {
   openModelData.notes=notes;
   const m=allModels.find(x=>String(x.id)===String(openModelData.id)); if(m) m.notes=notes;
   toast('Notes saved');
+}
+
+// Permanently delete a model: removes their uploaded photos from storage, then their profile row
+async function deleteModel(id, name) {
+  if (!confirm(`Permanently delete ${name||'this model'}? This removes their profile and all uploaded photos. This cannot be undone.`)) return;
+  const m = allModels.find(x=>String(x.id)===String(id)) || openModelData;
+  if (!m) return;
+  const urls = [m.profile_photo, ...toArr(m.photos), ...toArr(m.hair_photos), ...toArr(m.mua_photos), ...toArr(m.outfit_photos), ...toArr(m.face_photos)].filter(Boolean);
+  const marker = '/model-photos/';
+  const paths = urls.map(u=>{ const i=u.indexOf(marker); return i>-1 ? u.slice(i+marker.length) : null; }).filter(Boolean);
+  if (paths.length) await sb.storage.from('model-photos').remove(paths);
+  const { error } = await sb.from('model_profiles').delete().eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  allModels = allModels.filter(x=>String(x.id)!==String(id));
+  closePanel();
+  refreshCurrentView();
+  toast(`${(name||'Model').split(' ')[0]} deleted`);
 }
 
 // ═══════════════════════════════════════════════
