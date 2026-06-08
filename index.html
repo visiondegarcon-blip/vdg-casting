@@ -130,10 +130,40 @@
                     </select>
                   </div>
                 </div>
+                <div class="form-group">
+                  <label>Face Close-Up Photo</label>
+                  <input type="file" id="ex-face" accept="image/*"/>
+                </div>
+                <div class="form-group">
+                  <label>Base Fit Photos</label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-fit').click()">
+                    <input type="file" id="ex-fit" multiple accept="image/*" onchange="markUploaded('ex-fit','ex-fit-status')"/>
+                    <div class="upload-zone-icon">📸</div>
+                    <div class="upload-zone-text" id="ex-fit-status">Tap to add base fits</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Hair Inspo Photos</label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-hair').click()">
+                    <input type="file" id="ex-hair" multiple accept="image/*" onchange="markUploaded('ex-hair','ex-hair-status')"/>
+                    <div class="upload-zone-icon">💇</div>
+                    <div class="upload-zone-text" id="ex-hair-status">Tap to add hair inspo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Makeup Inspo Photos</label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-mua').click()">
+                    <input type="file" id="ex-mua" multiple accept="image/*" onchange="markUploaded('ex-mua','ex-mua-status')"/>
+                    <div class="upload-zone-icon">💄</div>
+                    <div class="upload-zone-text" id="ex-mua-status">Tap to add makeup inspo</div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Notes (optional)</label>
+                  <textarea id="ex-note" placeholder="Anything you want the hair, makeup or styling team to know…"></textarea>
+                </div>
               </div>
             </div>
-
-            <!-- New model form -->
             <div id="new-model-form" class="hidden">
               <div class="form-group">
                 <label>Profile Photo</label>
@@ -308,12 +338,24 @@
                 </div>
               </div>
               <div class="form-group">
-                <label>Face Close-Up Photo 1</label>
+                <label>Face Close-Up Photo</label>
                 <input type="file" id="new-face1" accept="image/*"/>
               </div>
               <div class="form-group">
-                <label>Face Close-Up Photo 2</label>
-                <input type="file" id="new-face2" accept="image/*"/>
+                <label>Base Fit Photos</label>
+                <input type="file" id="new-fit" multiple accept="image/*"/>
+              </div>
+              <div class="form-group">
+                <label>Hair Inspo Photos</label>
+                <input type="file" id="new-hair-photos" multiple accept="image/*"/>
+              </div>
+              <div class="form-group">
+                <label>Makeup Inspo Photos</label>
+                <input type="file" id="new-mua-photos" multiple accept="image/*"/>
+              </div>
+              <div class="form-group">
+                <label>Notes (optional)</label>
+                <textarea id="new-note" placeholder="Anything for the hair, makeup or styling team…"></textarea>
               </div>
             </div>
           </div>
@@ -377,6 +419,7 @@
           <button class="tab-btn active" onclick="setAdminTab(this,'all')">All</button>
           <button class="tab-btn" onclick="setAdminTab(this,'approved')">Approved</button>
           <button class="tab-btn" onclick="setAdminTab(this,'pending')">Pending</button>
+          <button class="tab-btn" onclick="setAdminTab(this,'completed')">Completed</button>
           <button class="tab-btn" onclick="setAdminTab(this,'inventory')">Inventory</button>
         </div>
         <div id="models-tab-content">
@@ -402,8 +445,9 @@
       <div class="sidebar-logo">VDG</div>
       <div class="sidebar-event">Brisbane — Jul 5</div>
       <nav class="sidebar-nav">
-        <button class="nav-item active" onclick="staffNav('all',this)"><span class="nav-icon">◉</span> All Models</button>
-        <button class="nav-item" onclick="staffNav('mine',this)"><span class="nav-icon">◎</span> My Models</button>
+        <div style="padding:10px 12px;font-size:11px;color:rgba(255,255,255,.4);font-family:var(--font-mono);line-height:1.7">
+          Use the tabs above the models to switch between All Models, your selected models, and Inventory.
+        </div>
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-user-name" id="staff-name-display">—</div>
