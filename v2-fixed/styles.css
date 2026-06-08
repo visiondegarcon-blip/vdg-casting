@@ -304,9 +304,8 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 
 /* ── MODEL SELF-PROFILE ── */
 .mob-topbar { display: none; }
-#model-dashboard.dashboard { display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--surface); }
-.model-profile-wrap { width: 100%; max-width: 640px; max-height: 88vh; background: var(--white); border-radius: var(--radius-lg); overflow-y: auto; box-shadow: 0 30px 90px rgba(0,0,0,.18); animation: popIn .22s ease; }
-.model-profile-hero { background: var(--black); padding: 40px; display: flex; align-items: center; gap: 22px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.model-profile-wrap { min-height: 100vh; background: var(--surface); }
+.model-profile-hero { background: var(--black); padding: 40px; display: flex; align-items: center; gap: 22px; }
 .model-hero-avatar { width: 68px; height: 68px; border-radius: 50%; background: rgba(196,168,130,.2); border: 2px solid rgba(196,168,130,.3); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 26px; color: var(--brown-light); overflow: hidden; flex-shrink: 0; }
 .model-hero-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .model-hero-name { font-family: var(--font-display); font-size: 30px; letter-spacing: .05em; color: var(--white); font-weight: 300; }
@@ -451,7 +450,6 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   border-radius: var(--radius-sm);
   overflow: hidden;
   margin-bottom: 10px;
-  flex-shrink: 0;
 }
 .collapse-btn {
   width: 100%;
@@ -459,9 +457,6 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   padding: 14px 18px;
   background: var(--cream);
   border: none;
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;

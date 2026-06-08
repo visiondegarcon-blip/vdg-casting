@@ -25,11 +25,12 @@ const FLAG_MAP = {
   "Middle Eastern":"🌍","South Asian":"🌏","Polynesian / Pacific Islands":"🌊","Other":"🌍"
 };
 function getFlag(eth) { return FLAG_MAP[eth] || "🌍"; }
-// Supabase sometimes returns array-type Postgres columns as JSON-encoded strings — normalize to a real array
-function toArr(v) {
-  if (Array.isArray(v)) return v;
-  if (typeof v === 'string' && v.trim().startsWith('[')) {
-    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+
+// ── FIX: safely parse DB values that might come back as JSON strings instead of arrays ──
+function parseJsonArray(val) {
+  if (Array.isArray(val)) return val;
+  if (typeof val === 'string' && val.trim().startsWith('[')) {
+    try { const p = JSON.parse(val); return Array.isArray(p) ? p : []; } catch { return []; }
   }
   return [];
 }
@@ -243,18 +244,21 @@ async function signUpExistingModel(username, pin) {
   if (profileUrl) updates.profile_photo = profileUrl;
   if (ethnicity)  updates.ethnicity = ethnicity;
 
-  const { error } = await sb.from('model_profiles').update(updates).eq('id', nameVal);
+  // FIX: use .select().single() so we get back the updated row and can refresh allModels
+  const { data: updatedRow, error } = await sb.from('model_profiles').update(updates).eq('id', nameVal).select().single();
   if (error) { showError('signup-error',error.message); return; }
-  if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, nameVal);
+
+  // Keep allModels in sync so admin sees fresh data without reloading
+  if (updatedRow) {
+    const normalised = normaliseModel(updatedRow);
+    const idx = allModels.findIndex(x => String(x.id) === String(nameVal));
+    if (idx >= 0) allModels[idx] = normalised;
+    else allModels.push(normalised);
+  }
+
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
-}
-
-// Auto-add a model's "own outfit" signup photos as assigned inventory items under their name
-async function addOutfitsToInventory(urls, modelName) {
-  const rows = urls.map((url,i)=>({ name:`${modelName} – Own Outfit ${i+1}`, category:'Own Outfit', size_qty:'', assigned_model:modelName, photo_url:url }));
-  await sb.from('inventory').insert(rows);
 }
 
 async function signUpNewModel(username, pin) {
@@ -311,9 +315,13 @@ async function signUpNewModel(username, pin) {
     checklist_outfit:false, checklist_hair:false, checklist_makeup:false,
   };
 
-  const { error } = await sb.from('model_profiles').insert(payload);
+  // FIX: add .select().single() so we get back the new row's id and can push it to allModels
+  const { data: newRow, error } = await sb.from('model_profiles').insert(payload).select().single();
   if (error) { showError('signup-error',error.message); return; }
-  if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, fullName);
+
+  // Push to allModels so admin sees it immediately without a page reload
+  if (newRow) allModels.push(normaliseModel(newRow));
+
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
@@ -332,7 +340,8 @@ async function signIn() {
   if (model) {
     if (model.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
     currentUser = { id:model.id, name:model.full_name, role:'MODEL', username };
-    showModelDashboard(model);
+    // FIX: normalise array fields before rendering — guards against JSON strings from DB
+    showModelDashboard(normaliseModel(model));
     return;
   }
   const { data:user } = await sb.from('users').select('*').eq('username',username).maybeSingle();
@@ -354,9 +363,24 @@ function logout() {
 // ═══════════════════════════════════════════════
 // LOAD DATA
 // ═══════════════════════════════════════════════
+
+// FIX: normalise a single model row — ensures all array fields are proper JS arrays
+function normaliseModel(m) {
+  return {
+    ...m,
+    photos:        parseJsonArray(m.photos),
+    hair_photos:   parseJsonArray(m.hair_photos),
+    mua_photos:    parseJsonArray(m.mua_photos),
+    outfit_photos: parseJsonArray(m.outfit_photos),
+    face_photos:   parseJsonArray(m.face_photos),
+    tags:          parseJsonArray(m.tags),
+  };
+}
+
 async function loadAllModels() {
   const { data } = await sb.from('model_profiles').select('*').order('full_name');
-  allModels = data || [];
+  // FIX: normalise every row so photo arrays are always real JS arrays, never JSON strings
+  allModels = (data || []).map(normaliseModel);
 }
 async function loadInventory() {
   const { data } = await sb.from('inventory').select('*').order('created_at',{ascending:false});
@@ -555,7 +579,11 @@ async function openModelPanel(id) {
   let m = allModels.find(x=>String(x.id)===String(id));
   if (!m) {
     const { data } = await sb.from('model_profiles').select('*').eq('id', id).maybeSingle();
-    if (data) { m = data; allModels.push(data); }
+    if (data) {
+      // FIX: normalise arrays on the fallback DB fetch too
+      m = normaliseModel(data);
+      allModels.push(m);
+    }
   }
   if (!m) { toast('Could not load model', true); return; }
   openModelData = m;
@@ -568,11 +596,11 @@ async function openModelPanel(id) {
   const role    = currentUser?.role;
   const isAdmin = role==='ADMIN';
   const isHairOrMua = role==='HAIR_STYLIST' || role==='MAKEUP_ARTIST';
-  const photos  = toArr(m.photos);
-  const hairPh  = toArr(m.hair_photos);
-  const muaPh   = toArr(m.mua_photos);
-  const facePh  = toArr(m.face_photos);
-  const tags    = toArr(m.tags);
+  const photos  = m.photos      || [];
+  const hairPh  = m.hair_photos || [];
+  const muaPh   = m.mua_photos  || [];
+  const facePh  = m.face_photos || [];
+  const tags    = m.tags        || [];
   const modelInv = inventoryData.filter(i=>i.assigned_model===m.full_name);
 
   // ── Status action buttons (staff only) ──
@@ -594,7 +622,7 @@ async function openModelPanel(id) {
   }
 
   // ── Collapsible photo sections (Face / Hair+Makeup / Outfit) ──
-  const outfitPh = toArr(m.outfit_photos);
+  const outfitPh = m.outfit_photos || [];
   const photoGrid = (arr) => arr.length ? `<div class="photo-grid">${arr.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>` : '<div class="no-photos">None uploaded</div>';
 
   const faceSection = `
@@ -613,7 +641,7 @@ async function openModelPanel(id) {
     </div>`;
 
   // Outfit = assigned inventory + model's own fit photos + outfit photos
-  const invHTML = modelInv.length ? `<div class="panel-section-title" style="margin-top:4px">Assigned Inventory</div><p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 12px">Wardrobe items from inventory assigned to this model for the shoot.</p><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div>` : '';
+  const invHTML = modelInv.length ? `<div class="panel-section-title" style="margin-top:4px">Assigned Inventory</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div>` : '';
   const ownFits = [...photos, ...outfitPh];
   const outfitSection = `
     <div class="collapse-section">
@@ -949,12 +977,14 @@ async function showModelDashboard(model) {
   const modelInv  = inventoryData.filter(i=>i.assigned_model===model.full_name);
   const flag      = getFlag(model.ethnicity);
   const initials  = (model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const photos    = toArr(model.photos);
-  const hairPh    = toArr(model.hair_photos);
-  const muaPh     = toArr(model.mua_photos);
-  const outfitPh  = toArr(model.outfit_photos);
+  const photos    = model.photos        || [];
+  const hairPh    = model.hair_photos   || [];
+  const muaPh     = model.mua_photos    || [];
+  const outfitPh  = model.outfit_photos || [];
 
-  document.getElementById('model-profile-wrap').innerHTML = `
+  // FIX: wrap in try/catch so any render error shows a message instead of blank page
+  try {
+    document.getElementById('model-profile-wrap').innerHTML = `
     <div class="model-profile-hero">
       <div class="model-hero-avatar">${model.profile_photo?`<img src="${model.profile_photo}"/>`:initials}</div>
       <div>
@@ -978,16 +1008,17 @@ async function showModelDashboard(model) {
           <div class="detail-item"><label>Cultural Piece</label><div class="val">${model.cultural_piece&&model.cultural_piece!=='no'&&model.cultural_piece!=='false'?(model.cultural_desc||(model.cultural_piece==='try'?'Can try to get one':'Yes')):'None'}</div></div>
         </div>
       </div>
+      ${model.assigned_stylist||model.assigned_hair||model.assigned_makeup?`
       <div class="model-section">
         <div class="model-section-title">Your Team</div>
         <div class="model-team-cards">
-          <div class="model-team-card"><div class="model-team-label">Stylist</div><div class="model-team-name">${model.assigned_stylist||'Unassigned'}</div></div>
-          <div class="model-team-card"><div class="model-team-label">Hair</div><div class="model-team-name">${model.assigned_hair||'Unassigned'}</div></div>
-          <div class="model-team-card"><div class="model-team-label">Makeup</div><div class="model-team-name">${model.assigned_makeup||'Unassigned'}</div></div>
+          ${model.assigned_stylist?`<div class="model-team-card"><div class="model-team-label">Stylist</div><div class="model-team-name">${model.assigned_stylist}</div></div>`:''}
+          ${model.assigned_hair?`<div class="model-team-card"><div class="model-team-label">Hair</div><div class="model-team-name">${model.assigned_hair}</div></div>`:''}
+          ${model.assigned_makeup?`<div class="model-team-card"><div class="model-team-label">Makeup</div><div class="model-team-name">${model.assigned_makeup}</div></div>`:''}
         </div>
-      </div>
+      </div>`:''}
       ${model.notes?`<div class="model-section"><div class="model-section-title">Notes from Team</div><div style="font-size:14px">${model.notes}</div></div>`:''}
-      ${modelInv.length?`<div class="model-section"><div class="model-section-title">Your Stage Fit</div><p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:14px">Wardrobe items from inventory assigned to you for the shoot.</p><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
+      ${modelInv.length?`<div class="model-section"><div class="model-section-title">Your Stage Fit</div><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
       <div class="model-section">
         <div class="model-section-title">Add More Photos</div>
         <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Add to your base fits, hair inspo, makeup inspo, or your own outfit any time.</p>
@@ -999,11 +1030,21 @@ async function showModelDashboard(model) {
         </div>
         <div id="upload-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:12px"></div>
       </div>
-      ${outfitPh.length?`<div class="model-section"><div class="model-section-title">Your Own Outfit</div><div class="photo-grid">${outfitPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
+      ${(outfitPh.length)?`<div class="model-section"><div class="model-section-title">Your Own Outfit</div><div class="photo-grid">${outfitPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${photos.length?`<div class="model-section"><div class="model-section-title">Your Fits</div><div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${hairPh.length?`<div class="model-section"><div class="model-section-title">Hair Inspo</div><div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${muaPh.length?`<div class="model-section"><div class="model-section-title">Makeup Inspo</div><div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
     </div>`;
+  } catch(err) {
+    console.error('Model dashboard render error:', err);
+    document.getElementById('model-profile-wrap').innerHTML = `
+      <div style="padding:60px 40px;text-align:center;font-family:var(--font-mono);color:var(--dim)">
+        <div style="font-size:28px;margin-bottom:16px">⚠</div>
+        <div style="font-size:13px;margin-bottom:8px">Error loading your profile.</div>
+        <div style="font-size:11px">Please sign out and sign in again. If the problem continues, contact Daniel.</div>
+        <div style="font-size:10px;margin-top:16px;opacity:.6">${err.message||''}</div>
+      </div>`;
+  }
 }
 
 async function uploadMorePhotos(input, field, modelId) {
@@ -1011,13 +1052,13 @@ async function uploadMorePhotos(input, field, modelId) {
   const status=document.getElementById('upload-status'); if(status) status.textContent='Uploading…';
   const urls=await uploadFiles(files, modelId, field);
   const { data:current }=await sb.from('model_profiles').select(field).eq('id',modelId).single();
-  const existing=current?.[field]||[];
+  const existing=parseJsonArray(current?.[field]);
   await sb.from('model_profiles').update({[field]:[...existing,...urls]}).eq('id',modelId);
   if (status) status.textContent=`✓ ${urls.length} uploaded`;
   toast('Photos uploaded ✓');
   // reload model dashboard
   const { data:fresh }=await sb.from('model_profiles').select('*').eq('id',modelId).single();
-  if (fresh) showModelDashboard(fresh);
+  if (fresh) showModelDashboard(normaliseModel(fresh));
 }
 
 // ═══════════════════════════════════════════════
