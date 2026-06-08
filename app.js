@@ -34,6 +34,12 @@ function toArr(v) {
   return [];
 }
 
+function teamCard(role, name, staffByName) {
+  if (!name) return `<div class="model-team-card"><div class="model-team-label">${role}</div><div class="model-team-name">Unassigned</div></div>`;
+  const ig = staffByName[name];
+  return `<div class="model-team-card"><div class="model-team-label">${role}</div><div class="model-team-name">${name}</div>${ig?`<div class="model-team-ig">@${ig}</div>`:''}</div>`;
+}
+
 // Map role → which status/assignment fields it controls
 const ROLE_FIELDS = {
   STYLIST:       { status: 'stylist_status', assign: 'assigned_stylist', label: 'Stylist',       hasPending: false },
@@ -203,9 +209,10 @@ async function signUp() {
     }
     const nameVal = document.getElementById('signup-name-staff').value;
     if (!nameVal) { showError('signup-error','Select your name.'); return; }
+    const instagram = document.getElementById('signup-staff-instagram').value.trim().replace(/^@/,'');
     const { data:ex } = await sb.from('users').select('id').eq('username',username).maybeSingle();
     if (ex) { showError('signup-error','Username already taken.'); return; }
-    const { error } = await sb.from('users').insert({ name:nameVal, role, username, pin });
+    const { error } = await sb.from('users').insert({ name:nameVal, role, username, pin, instagram });
     if (error) { showError('signup-error',error.message); return; }
     toast('Account created! Sign in now.');
     showTab('signin');
@@ -946,6 +953,12 @@ async function showModelDashboard(model) {
   if (!wrap) return;
   document.getElementById('model-dashboard').classList.remove('hidden');
   await loadInventory();
+  const staffNames = [model.assigned_stylist, model.assigned_hair, model.assigned_makeup].filter(Boolean);
+  let staffByName = {};
+  if (staffNames.length) {
+    const { data:staffRows } = await sb.from('users').select('name,instagram').in('name', staffNames);
+    (staffRows||[]).forEach(s=>{ if (s.instagram) staffByName[s.name]=s.instagram; });
+  }
   const modelInv  = inventoryData.filter(i=>i.assigned_model===model.full_name);
   const flag      = getFlag(model.ethnicity);
   const initials  = (model.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
@@ -968,22 +981,11 @@ async function showModelDashboard(model) {
     </div>
     <div class="model-profile-body">
       <div class="model-section">
-        <div class="model-section-title">Your Details</div>
-        <div class="detail-grid">
-          <div class="detail-item"><label>Age</label><div class="val">${model.age||'—'}</div></div>
-          <div class="detail-item"><label>Height</label><div class="val">${model.height||'—'}</div></div>
-          <div class="detail-item"><label>Top</label><div class="val">${model.top_size||'—'}</div></div>
-          <div class="detail-item"><label>Jeans</label><div class="val">${model.jean_size||'—'}</div></div>
-          <div class="detail-item"><label>Style</label><div class="val">${model.style||'—'}</div></div>
-          <div class="detail-item"><label>Cultural Piece</label><div class="val">${model.cultural_piece&&model.cultural_piece!=='no'&&model.cultural_piece!=='false'?(model.cultural_desc||(model.cultural_piece==='try'?'Can try to get one':'Yes')):'None'}</div></div>
-        </div>
-      </div>
-      <div class="model-section">
         <div class="model-section-title">Your Team</div>
         <div class="model-team-cards">
-          <div class="model-team-card"><div class="model-team-label">Stylist</div><div class="model-team-name">${model.assigned_stylist||'Unassigned'}</div></div>
-          <div class="model-team-card"><div class="model-team-label">Hair</div><div class="model-team-name">${model.assigned_hair||'Unassigned'}</div></div>
-          <div class="model-team-card"><div class="model-team-label">Makeup</div><div class="model-team-name">${model.assigned_makeup||'Unassigned'}</div></div>
+          ${teamCard('Stylist', model.assigned_stylist, staffByName)}
+          ${teamCard('Hair', model.assigned_hair, staffByName)}
+          ${teamCard('Makeup', model.assigned_makeup, staffByName)}
         </div>
       </div>
       ${model.notes?`<div class="model-section"><div class="model-section-title">Notes from Team</div><div style="font-size:14px">${model.notes}</div></div>`:''}
