@@ -50,15 +50,16 @@ const ROLE_FIELDS = {
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let currentUser   = null;
-let allModels     = [];
-let inventoryData = [];
-let activeTab     = 'all';
-let staffTab      = 'all';
-let openModelData = null;
-let isNewModel    = false;
-let isNewStaff    = false;
-let staffUsers    = [];
+let currentUser      = null;
+let allModels        = [];
+let inventoryData    = [];
+let activeTab        = 'all';
+let staffTab         = 'all';
+let openModelData    = null;
+let isNewModel       = false;
+let isNewStaff       = false;
+let staffUsers       = [];
+let currentModelData = null; // used by Edit Details panel
 
 // ═══════════════════════════════════════════════
 // AUTH TABS
@@ -1487,6 +1488,7 @@ async function saveEditDetails() {
 // MODEL DASHBOARD
 // ═══════════════════════════════════════════════
 async function showModelDashboard(model) {
+  currentModelData = model; // store globally so Edit Details button can access it safely
   hideAll();
   const wrap = document.getElementById('model-profile-wrap');
   if (!wrap) return;
@@ -1518,7 +1520,7 @@ async function showModelDashboard(model) {
         <div class="model-hero-status">
           <span class="model-hero-flag">${flag}</span>
         </div>
-        <button class="edit-details-btn" onclick='openEditDetails(${JSON.stringify(model)})'>✏️ Edit Details</button>
+        <button class="edit-details-btn" onclick="openEditDetails(currentModelData)">✏️ Edit Details</button>
       </div>
     </div>
     <div class="model-profile-body">
