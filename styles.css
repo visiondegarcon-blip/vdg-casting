@@ -149,24 +149,28 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 }
 .edit-details-footer .btn { margin-top: 0; }
 
-/* Edit Details button on model dashboard */
+/* Edit Details button on model dashboard (sits on dark hero background) */
 .edit-details-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 9px 18px;
-  background: none;
-  border: 1.5px solid var(--border);
+  background: rgba(255,255,255,0.10);
+  border: 1.5px solid rgba(255,255,255,0.30);
   border-radius: 24px;
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font-sans);
-  color: var(--dim);
+  color: rgba(255,255,255,0.80);
   cursor: pointer;
   transition: all .2s;
   margin-top: 12px;
 }
-.edit-details-btn:hover { border-color: var(--brown); color: var(--brown); }
+.edit-details-btn:hover {
+  background: rgba(196,168,130,0.25);
+  border-color: var(--brown-light);
+  color: var(--brown-light);
+}
 
 /* ── HAIR LENGTH BUTTON GROUP ── */
 .btn-group-select { display: flex; gap: 8px; }
