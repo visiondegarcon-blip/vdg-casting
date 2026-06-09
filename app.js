@@ -279,7 +279,7 @@ async function signUpExistingModel(username, pin) {
   const ethnicity = document.getElementById('existing-ethnicity')?.value || '';
   const note      = document.getElementById('ex-note')?.value.trim() || '';
 
-  const updates = { username, pin, registered:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
+  const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
   if (profileUrl) updates.profile_photo = profileUrl;
   if (ethnicity)  updates.ethnicity = ethnicity;
 
@@ -343,7 +343,7 @@ async function signUpNewModel(username, pin) {
     makeup_self:   document.getElementById('new-makeup-self').value==='true',
     agency:        document.getElementById('new-agency').value,
     model_note:    document.getElementById('new-note').value.trim(),
-    username, pin, registered:true, approved:false,
+    username, pin, registered:true, approved:true,
     profile_photo: profileUrl, face_photos:faceUrls,
     photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls,
     tags:[], notes:'',
@@ -461,12 +461,49 @@ function renderAdminModels(search) {
     const q = search.toLowerCase();
     list = list.filter(m=>(m.full_name||'').toLowerCase().includes(q)||(m.instagram||'').toLowerCase().includes(q)||(m.suburb||'').toLowerCase().includes(q));
   }
-  if (activeTab==='approved')  list = list.filter(m=>m.approved);
-  if (activeTab==='pending')   list = list.filter(m=>!m.approved);
   if (activeTab==='completed') list = list.filter(m=>isCompleted(m));
+  renderSignedUpPanel();
   const grid = document.getElementById('admin-model-grid');
   if (!grid) return;
   grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,'ADMIN')).join('') : '<div class="loading-center" style="grid-column:1/-1">No models here</div>';
+}
+
+function renderSignedUpPanel() {
+  const panel = document.getElementById('signed-up-panel');
+  if (!panel) return;
+  const newSignups = allModels.filter(m => m.approved && !m.signup_acknowledged);
+  if (!newSignups.length) { panel.innerHTML = ''; return; }
+  panel.innerHTML = `
+    <div class="collapse-section open" style="margin-bottom:24px">
+      <button class="collapse-btn" onclick="toggleCollapse(this)">
+        ✅ Signed Up
+        <span style="font-size:10px;font-family:var(--font-mono);opacity:.7;margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0">${newSignups.length} new</span>
+        <span class="collapse-arrow">▾</span>
+      </button>
+      <div class="collapse-body">
+        <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 14px">Models who just completed sign up — tap × to dismiss once you've checked their profile.</p>
+        <div class="signed-up-grid">
+          ${newSignups.map(m => {
+            const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+            const avatar = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
+            return `<div class="signed-up-card" onclick="openModelPanel('${m.id}')">
+              <button class="signed-up-dismiss" onclick="event.stopPropagation();dismissSignup('${m.id}')" title="Dismiss">×</button>
+              <div class="signed-up-avatar">${avatar}</div>
+              <div class="signed-up-name">${(m.full_name||'—').split(' ')[0]}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function dismissSignup(id) {
+  const { error } = await sb.from('model_profiles').update({ signup_acknowledged: true }).eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  const m = allModels.find(x=>String(x.id)===String(id));
+  if (m) m.signup_acknowledged = true;
+  renderSignedUpPanel();
+  toast('Dismissed ✓');
 }
 
 function filterModels(val) { if (activeTab!=='inventory') renderAdminModels(val); }
@@ -496,6 +533,9 @@ function modelCardHTML(m, viewerRole) {
   const genderBadge = m.gender ? `<span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender}</span>` : '';
   const igBadge     = m.instagram ? `<span class="badge badge-outline">@${m.instagram}</span>` : '';
   const ethBadge    = m.ethnicity ? `<span class="badge badge-outline">${flag} ${m.ethnicity}</span>` : '';
+  const signupBadge = !isAdmin ? (m.approved
+    ? `<span class="badge badge-green">✓ Signed Up</span>`
+    : `<span class="badge badge-outline">Not Signed Up</span>`) : '';
 
   const adminFooter = isAdmin ? `
     <div class="card-footer">
@@ -511,7 +551,6 @@ function modelCardHTML(m, viewerRole) {
         <option value="">MUA…</option>
         ${staffNamesFor('MAKEUP_ARTIST').map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}
       </select>
-      <button class="btn-approve${m.approved?' btn-approved':''}" onclick="toggleApprove('${m.id}');event.stopPropagation()">${m.approved?'✓ Approved':'Approve'}</button>
     </div>` : '';
 
   const checklist = isAdmin ? `
@@ -529,9 +568,7 @@ function modelCardHTML(m, viewerRole) {
           <div class="card-name">${m.full_name||'—'} <span style="font-size:16px">${flag}</span></div>
           <div class="card-handle">${m.instagram?'@'+m.instagram:'—'}</div>
         </div>
-        <div class="card-badges">
-          ${isAdmin?`<span class="badge ${m.approved?'badge-brown':'badge-outline'}">${m.approved?'✓':'Pending'}</span>`:''}
-        </div>
+        <div class="card-badges"></div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
         ${genderBadge}
@@ -539,6 +576,7 @@ function modelCardHTML(m, viewerRole) {
         ${ethBadge}
         ${assignedTags}
         ${statusPill}
+        ${signupBadge}
       </div>
       <div class="card-details">
         <div class="card-row"><span>Size</span><span>Top ${m.top_size||'—'} · Jean ${m.jean_size||'—'}</span></div>
@@ -748,12 +786,11 @@ async function openModelPanel(id) {
   // ── Admin assignment block ──
   const adminBlock = isAdmin ? `
     <div>
-      <div class="panel-section-title">Assignment & Status</div>
+      <div class="panel-section-title">Assignment</div>
       <div class="assign-grid">
         <div class="form-group" style="margin-bottom:0"><label>Stylist</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_stylist',this.value)"><option value="">Unassigned</option>${staffNamesFor('STYLIST').map(s=>`<option value="${s}"${m.assigned_stylist===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
         <div class="form-group" style="margin-bottom:0"><label>Hair</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_hair',this.value)"><option value="">Unassigned</option>${staffNamesFor('HAIR_STYLIST').map(s=>`<option value="${s}"${m.assigned_hair===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
         <div class="form-group" style="margin-bottom:0"><label>MUA</label><div class="select-wrap"><select onchange="assignField('${m.id}','assigned_makeup',this.value)"><option value="">Unassigned</option>${staffNamesFor('MAKEUP_ARTIST').map(s=>`<option value="${s}"${m.assigned_makeup===s?' selected':''}>${s}</option>`).join('')}</select></div></div>
-        <div class="form-group" style="margin-bottom:0"><label>Approval</label><button class="btn btn-sm ${m.approved?'btn-brown':'btn-ghost'}" onclick="toggleApprove('${m.id}');openModelPanel('${m.id}')">${m.approved?'✓ Approved':'Approve'}</button></div>
       </div>
     </div>
     <div>
@@ -890,7 +927,7 @@ function exportModelsCSV() {
   const cols = [
     ['full_name','Name'],['phone','Phone'],['instagram','Instagram'],['ethnicity','Ethnicity'],
     ['assigned_stylist','Stylist'],['assigned_hair','Hair'],['assigned_makeup','Makeup'],
-    ['approved','Approved'],['checklist_outfit','Outfit Done'],['checklist_hair','Hair Done'],['checklist_makeup','Makeup Done'],
+    ['approved','Signed Up'],['checklist_outfit','Outfit Done'],['checklist_hair','Hair Done'],['checklist_makeup','Makeup Done'],
     ['notes','Notes']
   ];
   const header = cols.map(c=>c[1]).join(',');
@@ -947,7 +984,7 @@ async function setStaffTab(btn, tab) {
 function renderStaffModels(search) {
   const role = currentUser?.role;
   const rf   = ROLE_FIELDS[role];
-  let list = allModels.filter(m=>m.approved); // staff only see approved models
+  let list = [...allModels];
 
   // Hair/Makeup only see models who need that service (default true if column missing)
   if (role==='HAIR_STYLIST')   list = list.filter(m => m.needs_hair !== false);
@@ -962,7 +999,7 @@ function renderStaffModels(search) {
   }
   const grid=document.getElementById('staff-model-grid');
   if (!grid) return;
-  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,role)).join('') : `<div class="loading-center">${staffTab==='mine'?'No models selected yet':'No approved models yet'}</div>`;
+  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,role)).join('') : `<div class="loading-center">${staffTab==='mine'?'No models selected yet':'No models yet'}</div>`;
 }
 function filterStaffModels(val) { if (staffTab!=='inventory') renderStaffModels(val); }
 
@@ -1129,7 +1166,6 @@ async function showModelDashboard(model) {
         <div class="model-hero-name">${model.full_name||'—'}</div>
         <div class="model-hero-handle">${model.instagram?'@'+model.instagram:''}</div>
         <div class="model-hero-status">
-          <span class="badge ${model.approved?'badge-brown':'badge-outline'}">${model.approved?'✓ Approved':'Pending Approval'}</span>
           <span class="model-hero-flag">${flag}</span>
         </div>
       </div>

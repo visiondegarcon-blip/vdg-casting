@@ -452,12 +452,11 @@
       <div id="admin-models-panel" class="panel-content">
         <div class="tab-nav">
           <button class="tab-btn active" onclick="setAdminTab(this,'all')">All</button>
-          <button class="tab-btn" onclick="setAdminTab(this,'approved')">Approved</button>
-          <button class="tab-btn" onclick="setAdminTab(this,'pending')">Pending</button>
           <button class="tab-btn" onclick="setAdminTab(this,'completed')">Completed</button>
           <button class="tab-btn" onclick="setAdminTab(this,'inventory')">Inventory</button>
         </div>
         <div id="models-tab-content">
+          <div id="signed-up-panel"></div>
           <div class="model-grid" id="admin-model-grid"></div>
         </div>
         <div id="inventory-tab-content" class="hidden">
