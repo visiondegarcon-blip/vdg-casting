@@ -213,7 +213,8 @@ async function uploadFiles(fileList, folder, subfolder, max) {
   let files = Array.from(fileList);
   if (max && files.length > max) files = files.slice(0, max);
   for (const file of files) {
-    const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}_${file.name}`;
+    // Generate safe path without original filename to prevent path traversal
+    const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
     const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true });
     if (!error) {
       const { data } = sb.storage.from('model-photos').getPublicUrl(path);
@@ -999,12 +1000,12 @@ async function openModelPanel(id) {
     </div>
     <div>
       <div class="panel-section-title">Tags</div>
-      <div class="tag-row"><input type="text" id="tag-input" placeholder="Add tag…" onkeydown="if(event.key==='Enter')addPanelTag()"/><button class="btn btn-sm btn-brown" style="width:auto;margin-top:0" onclick="addPanelTag()">+</button></div>
+      <div class="tag-row"><input type="text" id="tag-input" maxlength="50" placeholder="Add tag…" onkeydown="if(event.key==='Enter')addPanelTag()"/><button class="btn btn-sm btn-brown" style="width:auto;margin-top:0" onclick="addPanelTag()">+</button></div>
       <div class="tags-wrap" id="panel-tags">${tags.map(t=>`<span class="tag-pill" onclick="removePanelTag('${t}')">${t}<span class="x"> ×</span></span>`).join('')}</div>
     </div>
     <div>
       <div class="panel-section-title">Internal Notes</div>
-      <textarea class="notes-field" id="panel-notes" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
+      <textarea class="notes-field" id="panel-notes" maxlength="2000" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
     </div>
     <div>
       <button class="btn btn-sm btn-ghost" onclick="resetModelPin('${m.id}','${(m.full_name||'').replace(/'/g,"\\'")}')">🔑 Reset PIN</button>
@@ -1502,7 +1503,6 @@ async function saveEditDetails() {
   errEl.textContent = '';
   if (saveBtn) { saveBtn.textContent = 'Saving…'; saveBtn.disabled = true; }
 
-  console.log('[EditDetails] saving for id:', editDetailsModelId, typeof editDetailsModelId);
 
   const updates = {
     instagram:     document.getElementById('edit-instagram').value.trim().replace(/^@/,''),
@@ -1590,7 +1590,6 @@ async function saveEditDetails() {
     .update(updates)
     .eq('id', editDetailsModelId)
     .select();
-  console.log('[EditDetails] update result:', { error, updateData, count });
 
   if (saveBtn) { saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; }
 
