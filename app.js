@@ -786,10 +786,15 @@ async function setStatus(id, status) {
 // MODEL DETAIL PANEL
 // ═══════════════════════════════════════════════
 async function openModelPanel(id) {
-  let m = allModels.find(x=>String(x.id)===String(id));
-  if (!m) {
-    const { data } = await sb.from('model_profiles').select('*').eq('id', id).maybeSingle();
-    if (data) { m = data; allModels.push(data); }
+  // Always fetch fresh from DB so staff see latest model self-edits immediately
+  const { data: freshData } = await sb.from('model_profiles').select('*').eq('id', id).maybeSingle();
+  let m = freshData;
+  if (m) {
+    // Keep allModels cache in sync
+    const idx = allModels.findIndex(x => String(x.id) === String(id));
+    if (idx !== -1) allModels[idx] = m; else allModels.push(m);
+  } else {
+    m = allModels.find(x => String(x.id) === String(id));
   }
   if (!m) { toast('Could not load model', true); return; }
   openModelData = m;
@@ -1472,41 +1477,54 @@ async function saveEditDetails() {
     if (u.length) updates.profile_photo = u[0];
   }
 
-  // Get current model data to merge photo arrays
-  const { data: currentModel } = await sb.from('model_profiles').select('face_photos,photos,hair_photos,mua_photos,outfit_photos').eq('id', editDetailsModelId).single();
-
-  // Upload and merge photo arrays
+  // Only fetch current photo arrays if at least one photo input has files
   const photoFields = [
-    { inputId: 'edit-face-upload', field: 'face_photos', statusId: 'edit-face-status', folder: 'face', max: 3 },
-    { inputId: 'edit-fit-upload', field: 'photos', statusId: 'edit-fit-status', folder: 'fit', max: 3 },
-    { inputId: 'edit-hair-upload', field: 'hair_photos', statusId: 'edit-hair-status', folder: 'hair', max: 3 },
-    { inputId: 'edit-mua-upload', field: 'mua_photos', statusId: 'edit-mua-status', folder: 'mua', max: 3 },
+    { inputId: 'edit-face-upload',   field: 'face_photos',   statusId: 'edit-face-status',   folder: 'face',   max: 3 },
+    { inputId: 'edit-fit-upload',    field: 'photos',        statusId: 'edit-fit-status',    folder: 'fit',    max: 3 },
+    { inputId: 'edit-hair-upload',   field: 'hair_photos',   statusId: 'edit-hair-status',   folder: 'hair',   max: 3 },
+    { inputId: 'edit-mua-upload',    field: 'mua_photos',    statusId: 'edit-mua-status',    folder: 'mua',    max: 3 },
     { inputId: 'edit-outfit-upload', field: 'outfit_photos', statusId: 'edit-outfit-status', folder: 'outfit', max: 3 },
   ];
+  const hasNewPhotos = photoFields.some(({ inputId }) => {
+    const el = document.getElementById(inputId);
+    return el && el.files.length > 0;
+  });
 
-  for (const { inputId, field, statusId, folder, max } of photoFields) {
-    const input = document.getElementById(inputId);
-    if (input && input.files.length) {
+  if (hasNewPhotos) {
+    // Fetch existing arrays once, then upload each field in parallel
+    const { data: currentModel } = await sb.from('model_profiles')
+      .select('face_photos,photos,hair_photos,mua_photos,outfit_photos')
+      .eq('id', editDetailsModelId).single();
+
+    await Promise.all(photoFields.map(async ({ inputId, field, statusId, folder, max }) => {
+      const input = document.getElementById(inputId);
+      if (!input || !input.files.length) return;
       const uploaded = await uploadFiles(Array.from(input.files), editDetailsModelId, folder, max);
       if (uploaded.length) {
-        const existing = toArr(currentModel?.[field]) || [];
-        updates[field] = [...existing, ...uploaded];
+        updates[field] = [...toArr(currentModel?.[field]), ...uploaded];
         const statusEl = document.getElementById(statusId);
         if (statusEl) statusEl.textContent = `✓ ${uploaded.length} uploaded`;
       }
-    }
+    }));
   }
 
   const { error } = await sb.from('model_profiles').update(updates).eq('id', editDetailsModelId);
   if (error) { errEl.textContent = error.message; return; }
 
   errEl.textContent = '';
-  toast('Details saved ✓');
-  closeEditDetails();
 
-  // Refresh model dashboard with updated data
+  // Update allModels cache so staff see changes immediately without re-login
   const { data: fresh } = await sb.from('model_profiles').select('*').eq('id', editDetailsModelId).single();
-  if (fresh) showModelDashboard(fresh);
+  if (fresh) {
+    const idx = allModels.findIndex(m => String(m.id) === String(editDetailsModelId));
+    if (idx !== -1) allModels[idx] = fresh; else allModels.push(fresh);
+    toast('Details saved ✓');
+    closeEditDetails();
+    showModelDashboard(fresh);
+  } else {
+    toast('Details saved ✓');
+    closeEditDetails();
+  }
 }
 
 // ═══════════════════════════════════════════════
