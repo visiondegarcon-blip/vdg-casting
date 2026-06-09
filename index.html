@@ -131,7 +131,12 @@
                 </div>
                 <div class="form-group">
                   <label>Face Close-Up Photo</label>
-                  <input type="file" id="ex-face" accept="image/*"/>
+                  <div class="upload-zone" onclick="document.getElementById('ex-face').click()">
+                    <input type="file" id="ex-face" accept="image/*" style="display:none" onchange="pickFiles('ex-face',1)"/>
+                    <div class="upload-zone-icon">👤</div>
+                    <div class="upload-zone-text">Tap to upload your face close-up</div>
+                  </div>
+                  <div class="file-previews" id="ex-face-previews"></div>
                 </div>
 
                 <!-- FOUNDATION FITS/ITEMS -->
@@ -142,10 +147,11 @@
                 <div class="form-group">
                   <label>Upload Photos <span style="color:var(--dim)">(optional, up to 3 — auto-added to your inventory)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-outfit').click()">
-                    <input type="file" id="ex-outfit" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-outfit','ex-outfit-status')"/>
+                    <input type="file" id="ex-outfit" multiple accept="image/*" style="display:none" onchange="pickFiles('ex-outfit',3)"/>
                     <div class="upload-zone-icon">👕</div>
-                    <div class="upload-zone-text" id="ex-outfit-status">Tap to add fits you already own that match the theme</div>
+                    <div class="upload-zone-text">Tap to add fits you already own that match the theme</div>
                   </div>
+                  <div class="file-previews" id="ex-outfit-previews"></div>
                 </div>
                 <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--cream);border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-top:4px;margin-bottom:16px;cursor:pointer" onclick="document.getElementById('ex-no-own-outfit').click()">
                   <input type="checkbox" id="ex-no-own-outfit" style="width:18px;height:18px;min-width:18px;cursor:pointer;accent-color:var(--brown);margin-top:1px" onclick="event.stopPropagation()"/>
@@ -155,26 +161,38 @@
                 <div class="form-group">
                   <label>Outfit Inspo Photos — Pinterest traditional/streetwear mix <span style="color:var(--dim)">(up to 3)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-fit').click()">
-                    <input type="file" id="ex-fit" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-fit','ex-fit-status')"/>
+                    <input type="file" id="ex-fit" multiple accept="image/*" style="display:none" onchange="pickFiles('ex-fit',3)"/>
                     <div class="upload-zone-icon">📸</div>
-                    <div class="upload-zone-text" id="ex-fit-status">Tap to add outfit inspo</div>
+                    <div class="upload-zone-text">Tap to add outfit inspo</div>
                   </div>
+                  <div class="file-previews" id="ex-fit-previews"></div>
                 </div>
                 <div class="form-group">
                   <label>Hair Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-hair').click()">
-                    <input type="file" id="ex-hair" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-hair','ex-hair-status')"/>
+                    <input type="file" id="ex-hair" multiple accept="image/*" style="display:none" onchange="pickFiles('ex-hair',3)"/>
                     <div class="upload-zone-icon">💇</div>
-                    <div class="upload-zone-text" id="ex-hair-status">Tap to add hair inspo</div>
+                    <div class="upload-hint-red">upload photos of hairstyles you'd want to have for the event that fit the theme / pinterest pics etc</div>
                   </div>
+                  <div class="file-previews" id="ex-hair-previews"></div>
+                </div>
+                <div class="form-group">
+                  <label>Current Hairstyle Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                  <div class="upload-zone" onclick="document.getElementById('ex-current-hair').click()">
+                    <input type="file" id="ex-current-hair" multiple accept="image/*" style="display:none" onchange="pickFiles('ex-current-hair',3)"/>
+                    <div class="upload-zone-icon">💇‍♀️</div>
+                    <div class="upload-hint-red">show us your hair as it is right now so the hair team knows what they're working with</div>
+                  </div>
+                  <div class="file-previews" id="ex-current-hair-previews"></div>
                 </div>
                 <div class="form-group">
                   <label>Makeup Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
                   <div class="upload-zone" onclick="document.getElementById('ex-mua').click()">
-                    <input type="file" id="ex-mua" multiple accept="image/*" onchange="limitFiles(this,3);markUploaded('ex-mua','ex-mua-status')"/>
+                    <input type="file" id="ex-mua" multiple accept="image/*" style="display:none" onchange="pickFiles('ex-mua',3)"/>
                     <div class="upload-zone-icon">💄</div>
-                    <div class="upload-zone-text" id="ex-mua-status">Tap to add makeup inspo</div>
+                    <div class="upload-hint-red">if you have a unique makeup style or face art / any inspo in general off pinterest eg upload it here</div>
                   </div>
+                  <div class="file-previews" id="ex-mua-previews"></div>
                 </div>
                 <div class="form-group">
                   <label>Hair Texture</label>
@@ -417,7 +435,12 @@
               </div>
               <div class="form-group">
                 <label>Face Close-Up Photo</label>
-                <input type="file" id="new-face1" accept="image/*"/>
+                <div class="upload-zone" onclick="document.getElementById('new-face1').click()">
+                  <input type="file" id="new-face1" accept="image/*" style="display:none" onchange="pickFiles('new-face1',1)"/>
+                  <div class="upload-zone-icon">👤</div>
+                  <div class="upload-zone-text">Tap to upload your face close-up</div>
+                </div>
+                <div class="file-previews" id="new-face1-previews"></div>
               </div>
 
               <!-- FOUNDATION FITS/ITEMS -->
@@ -427,7 +450,12 @@
               </div>
               <div class="form-group">
                 <label>Upload Photos <span style="color:var(--dim)">(optional, up to 3 — auto-added to your inventory)</span></label>
-                <input type="file" id="new-outfit" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+                <div class="upload-zone" onclick="document.getElementById('new-outfit').click()">
+                  <input type="file" id="new-outfit" multiple accept="image/*" style="display:none" onchange="pickFiles('new-outfit',3)"/>
+                  <div class="upload-zone-icon">👕</div>
+                  <div class="upload-zone-text">Tap to add fits you already own that match the theme</div>
+                </div>
+                <div class="file-previews" id="new-outfit-previews"></div>
               </div>
               <div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--cream);border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-top:4px;margin-bottom:16px;cursor:pointer" onclick="document.getElementById('new-no-own-outfit').click()">
                 <input type="checkbox" id="new-no-own-outfit" style="width:18px;height:18px;min-width:18px;cursor:pointer;accent-color:var(--brown);margin-top:1px" onclick="event.stopPropagation()"/>
@@ -436,15 +464,39 @@
 
               <div class="form-group">
                 <label>Outfit Inspo Photos — Pinterest traditional/streetwear mix <span style="color:var(--dim)">(up to 3)</span></label>
-                <input type="file" id="new-fit" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+                <div class="upload-zone" onclick="document.getElementById('new-fit').click()">
+                  <input type="file" id="new-fit" multiple accept="image/*" style="display:none" onchange="pickFiles('new-fit',3)"/>
+                  <div class="upload-zone-icon">📸</div>
+                  <div class="upload-zone-text">Tap to add outfit inspo</div>
+                </div>
+                <div class="file-previews" id="new-fit-previews"></div>
               </div>
               <div class="form-group">
                 <label>Hair Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
-                <input type="file" id="new-hair-photos" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+                <div class="upload-zone" onclick="document.getElementById('new-hair-photos').click()">
+                  <input type="file" id="new-hair-photos" multiple accept="image/*" style="display:none" onchange="pickFiles('new-hair-photos',3)"/>
+                  <div class="upload-zone-icon">💇</div>
+                  <div class="upload-hint-red">upload photos of hairstyles you'd want to have for the event that fit the theme / pinterest pics etc</div>
+                </div>
+                <div class="file-previews" id="new-hair-photos-previews"></div>
+              </div>
+              <div class="form-group">
+                <label>Current Hairstyle Photos <span style="color:var(--dim)">(up to 3)</span></label>
+                <div class="upload-zone" onclick="document.getElementById('new-current-hair').click()">
+                  <input type="file" id="new-current-hair" multiple accept="image/*" style="display:none" onchange="pickFiles('new-current-hair',3)"/>
+                  <div class="upload-zone-icon">💇‍♀️</div>
+                  <div class="upload-hint-red">show us your hair as it is right now so the hair team knows what they're working with</div>
+                </div>
+                <div class="file-previews" id="new-current-hair-previews"></div>
               </div>
               <div class="form-group">
                 <label>Makeup Inspo Photos <span style="color:var(--dim)">(up to 3)</span></label>
-                <input type="file" id="new-mua-photos" multiple accept="image/*" onchange="limitFiles(this,3)"/>
+                <div class="upload-zone" onclick="document.getElementById('new-mua-photos').click()">
+                  <input type="file" id="new-mua-photos" multiple accept="image/*" style="display:none" onchange="pickFiles('new-mua-photos',3)"/>
+                  <div class="upload-zone-icon">💄</div>
+                  <div class="upload-hint-red">if you have a unique makeup style or face art / any inspo in general off pinterest eg upload it here</div>
+                </div>
+                <div class="file-previews" id="new-mua-photos-previews"></div>
               </div>
               <div class="form-group">
                 <label>Notes (optional)</label>
@@ -526,6 +578,7 @@
       <div class="topbar">
         <div class="topbar-title" id="admin-page-title">All Models</div>
         <div class="topbar-actions">
+          <button class="btn btn-sm btn-brown" style="width:auto" onclick="openTaskModal('bulk')">📋 Assign Task to All</button>
           <button class="btn btn-sm btn-ghost" style="width:auto" onclick="exportModelsCSV()">⬇ Export CSV</button>
           <input type="text" class="search-input" placeholder="Search…" oninput="filterModels(this.value)" id="model-search"/>
         </div>
@@ -838,61 +891,79 @@
 
         <!-- Photo Uploads -->
         <div style="border-top: 1.5px solid var(--border); margin-top: 24px; padding-top: 20px;">
-          <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--brown); margin-bottom: 16px;">Update Your Photos</div>
+          <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--brown); margin-bottom: 16px;">Your Photos</div>
+          <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 18px">Tap × on any photo to permanently remove it, or upload more below.</p>
 
           <!-- Face Photos -->
           <div class="form-group">
             <label>Face Close-Up</label>
+            <div class="edit-existing-photos" id="edit-existing-face"></div>
             <div class="upload-zone" onclick="document.getElementById('edit-face-upload').click()">
-              <input type="file" id="edit-face-upload" multiple accept="image/*" style="display:none"/>
+              <input type="file" id="edit-face-upload" multiple accept="image/*" style="display:none" onchange="pickFiles('edit-face-upload',3)"/>
               <div class="upload-zone-icon">📸</div>
               <div class="upload-zone-text">Tap to upload</div>
             </div>
-            <div id="edit-face-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+            <div class="file-previews" id="edit-face-upload-previews"></div>
+          </div>
+
+          <!-- Current Hairstyle -->
+          <div class="form-group">
+            <label>Current Hairstyle</label>
+            <div class="edit-existing-photos" id="edit-existing-curhair"></div>
+            <div class="upload-zone" onclick="document.getElementById('edit-curhair-upload').click()">
+              <input type="file" id="edit-curhair-upload" multiple accept="image/*" style="display:none" onchange="pickFiles('edit-curhair-upload',3)"/>
+              <div class="upload-zone-icon">💇‍♀️</div>
+              <div class="upload-zone-text">Tap to upload</div>
+            </div>
+            <div class="file-previews" id="edit-curhair-upload-previews"></div>
           </div>
 
           <!-- Fit Inspo -->
           <div class="form-group">
             <label>Fit Inspo</label>
+            <div class="edit-existing-photos" id="edit-existing-fit"></div>
             <div class="upload-zone" onclick="document.getElementById('edit-fit-upload').click()">
-              <input type="file" id="edit-fit-upload" multiple accept="image/*" style="display:none"/>
+              <input type="file" id="edit-fit-upload" multiple accept="image/*" style="display:none" onchange="pickFiles('edit-fit-upload',3)"/>
               <div class="upload-zone-icon">👗</div>
               <div class="upload-zone-text">Tap to upload</div>
             </div>
-            <div id="edit-fit-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+            <div class="file-previews" id="edit-fit-upload-previews"></div>
           </div>
 
           <!-- Hair Inspo -->
           <div class="form-group">
             <label>Hair Inspo</label>
+            <div class="edit-existing-photos" id="edit-existing-hair"></div>
             <div class="upload-zone" onclick="document.getElementById('edit-hair-upload').click()">
-              <input type="file" id="edit-hair-upload" multiple accept="image/*" style="display:none"/>
+              <input type="file" id="edit-hair-upload" multiple accept="image/*" style="display:none" onchange="pickFiles('edit-hair-upload',3)"/>
               <div class="upload-zone-icon">💇</div>
               <div class="upload-zone-text">Tap to upload</div>
             </div>
-            <div id="edit-hair-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+            <div class="file-previews" id="edit-hair-upload-previews"></div>
           </div>
 
           <!-- Makeup Inspo -->
           <div class="form-group">
             <label>Makeup Inspo</label>
+            <div class="edit-existing-photos" id="edit-existing-mua"></div>
             <div class="upload-zone" onclick="document.getElementById('edit-mua-upload').click()">
-              <input type="file" id="edit-mua-upload" multiple accept="image/*" style="display:none"/>
+              <input type="file" id="edit-mua-upload" multiple accept="image/*" style="display:none" onchange="pickFiles('edit-mua-upload',3)"/>
               <div class="upload-zone-icon">💄</div>
               <div class="upload-zone-text">Tap to upload</div>
             </div>
-            <div id="edit-mua-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+            <div class="file-previews" id="edit-mua-upload-previews"></div>
           </div>
 
           <!-- Outfit Photos -->
           <div class="form-group">
             <label>Your Own Outfit</label>
+            <div class="edit-existing-photos" id="edit-existing-outfit"></div>
             <div class="upload-zone" onclick="document.getElementById('edit-outfit-upload').click()">
-              <input type="file" id="edit-outfit-upload" multiple accept="image/*" style="display:none"/>
+              <input type="file" id="edit-outfit-upload" multiple accept="image/*" style="display:none" onchange="pickFiles('edit-outfit-upload',3)"/>
               <div class="upload-zone-icon">👕</div>
               <div class="upload-zone-text">Tap to upload</div>
             </div>
-            <div id="edit-outfit-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+            <div class="file-previews" id="edit-outfit-upload-previews"></div>
           </div>
         </div>
 
@@ -904,11 +975,51 @@
     </div>
   </div>
 
+  <!-- ASSIGN TASK MODAL (admin) -->
+  <div class="modal-overlay hidden" id="task-modal-overlay" onclick="closeTaskModal(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <span id="task-modal-title" style="font-family:var(--font-display);font-size:22px;font-weight:400;letter-spacing:.04em">Assign Task</span>
+        <button class="panel-close" onclick="document.getElementById('task-modal-overlay').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="task-modal-sub" style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin:0 0 16px"></p>
+        <div class="form-group">
+          <label>What should they complete?</label>
+          <div class="task-modal-list" id="task-modal-list"></div>
+        </div>
+        <div class="form-group">
+          <label>Note <span style="color:var(--dim)">(optional — shown to the model)</span></label>
+          <textarea id="task-modal-note" maxlength="300" rows="2" placeholder="e.g. please use the pinterest theme we discussed"></textarea>
+        </div>
+        <button class="btn btn-brown" onclick="submitTaskAssign()">Assign</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPLETE TASKS PANEL (model) -->
+  <div class="edit-details-overlay hidden" id="task-panel-overlay">
+    <div class="edit-details-panel">
+      <div class="edit-details-header">
+        <div style="width:28px"></div>
+        <span style="font-family:var(--font-display);font-size:20px;font-weight:400;letter-spacing:.04em">Tasks to Complete</span>
+        <button class="panel-close" onclick="closeModelTaskPanel()">✕</button>
+      </div>
+      <div class="edit-details-body">
+        <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin:0 0 18px">The team asked you to finish these. Fill what you can and tap Done.</p>
+        <div id="task-panel-body"></div>
+      </div>
+      <div class="edit-details-footer">
+        <button class="btn btn-brown" id="task-panel-save" onclick="submitModelTasks()">Done</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast"></div>
   <button class="panel-back-btn hidden" id="panel-back-btn" onclick="closePanel()">←</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

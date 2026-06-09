@@ -93,6 +93,66 @@ function limitFiles(input, max) {
   }
 }
 
+// ═══════════════════════════════════════════════
+// REMOVABLE FILE PICKER
+// Lets a user add/remove individual photos BEFORE upload (signup + edit).
+// FileLists are immutable, so we keep our own array of File objects per input.
+// ═══════════════════════════════════════════════
+const pendingFiles = {};
+
+// Called from an input's onchange. Appends newly chosen files (up to `max`),
+// then resets the input so the same file can be re-picked and counts don't double.
+function pickFiles(inputId, max) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const current  = pendingFiles[inputId] || [];
+  let combined   = current.concat(Array.from(input.files));
+  if (max && combined.length > max) {
+    toast(`Max ${max} photo${max>1?'s':''} — keeping the first ${max}`, true);
+    combined = combined.slice(0, max);
+  }
+  pendingFiles[inputId] = combined;
+  input.value = '';
+  renderPendingPreviews(inputId, max);
+}
+
+function removePendingFile(inputId, idx, max) {
+  const arr = pendingFiles[inputId] || [];
+  arr.splice(idx, 1);
+  pendingFiles[inputId] = arr;
+  renderPendingPreviews(inputId, max);
+}
+
+// Renders thumbnails (with an × on each) into the <div id="{inputId}-previews">
+function renderPendingPreviews(inputId, max) {
+  const wrap = document.getElementById(inputId + '-previews');
+  if (!wrap) return;
+  const arr = pendingFiles[inputId] || [];
+  wrap.innerHTML = arr.map((f, i) => {
+    const url = URL.createObjectURL(f);
+    return `<div class="file-chip"><img src="${url}" alt=""/><button type="button" class="file-chip-x" onclick="event.stopPropagation();removePendingFile('${inputId}',${i},${max||0})">×</button></div>`;
+  }).join('');
+}
+
+// Returns the chosen files for an input as an array (falls back to live input.files)
+function chosenFiles(inputId) {
+  const arr = pendingFiles[inputId];
+  if (arr && arr.length) return arr;
+  const input = document.getElementById(inputId);
+  return input ? Array.from(input.files) : [];
+}
+
+// Clear staged files + their previews for the given input ids
+function clearPendingFiles(...ids) {
+  ids.forEach(id => {
+    pendingFiles[id] = [];
+    const w = document.getElementById(id + '-previews');
+    if (w) w.innerHTML = '';
+    const inp = document.getElementById(id);
+    if (inp) inp.value = '';
+  });
+}
+
 function previewExistingProfile(input) {
   const file = input.files[0]; if (!file) return;
   const r = new FileReader();
@@ -268,10 +328,9 @@ async function signUpExistingModel(username, pin) {
   const nameVal = document.getElementById('signup-name').value;
   if (!nameVal) { showError('signup-error','Select your name.'); return; }
   // Face photo is required
-  const faceInp = document.getElementById('ex-face');
-  if (!faceInp || !faceInp.files[0]) {
+  if (!chosenFiles('ex-face').length) {
     showError('signup-error','Please upload your face close-up photo — it\'s required to complete sign-up.');
-    faceInp?.scrollIntoView({ behavior:'smooth', block:'center' });
+    document.getElementById('ex-face')?.scrollIntoView({ behavior:'smooth', block:'center' });
     return;
   }
   // Allow re-signup: only block if username is taken by a DIFFERENT profile
@@ -287,12 +346,13 @@ async function signUpExistingModel(username, pin) {
     const u = await uploadFiles([profInput.files[0]], nameVal, 'profile');
     if (u.length) profileUrl = u[0];
   }
-  // Fit / hair / mua / outfit (max 3 each)
-  const faceUrls   = await uploadFiles(document.getElementById('ex-face').files,   nameVal, 'face', 1);
-  const fitUrls    = await uploadFiles(document.getElementById('ex-fit').files,    nameVal, 'fit', 3);
-  const hairUrls   = await uploadFiles(document.getElementById('ex-hair').files,   nameVal, 'hair', 3);
-  const muaUrls    = await uploadFiles(document.getElementById('ex-mua').files,    nameVal, 'mua', 3);
-  const outfitUrls = await uploadFiles(document.getElementById('ex-outfit').files, nameVal, 'outfit', 3);
+  // Fit / hair / mua / outfit / current hair (max 3 each)
+  const faceUrls    = await uploadFiles(chosenFiles('ex-face'),         nameVal, 'face', 1);
+  const fitUrls     = await uploadFiles(chosenFiles('ex-fit'),          nameVal, 'fit', 3);
+  const hairUrls    = await uploadFiles(chosenFiles('ex-hair'),         nameVal, 'hair', 3);
+  const muaUrls     = await uploadFiles(chosenFiles('ex-mua'),          nameVal, 'mua', 3);
+  const outfitUrls  = await uploadFiles(chosenFiles('ex-outfit'),       nameVal, 'outfit', 3);
+  const curHairUrls = await uploadFiles(chosenFiles('ex-current-hair'), nameVal, 'current_hair', 3);
 
   const ethnicity   = document.getElementById('existing-ethnicity')?.value || '';
   const note        = document.getElementById('ex-note')?.value.trim() || '';
@@ -300,7 +360,7 @@ async function signUpExistingModel(username, pin) {
   const hairLength  = document.getElementById('ex-hair-length-group-val')?.value || '';
   const noOwnOutfit = document.getElementById('ex-no-own-outfit')?.checked || false;
 
-  const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true, no_own_outfit:noOwnOutfit };
+  const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, current_hair_photos:curHairUrls, model_note:note, needs_hair:true, needs_makeup:true, no_own_outfit:noOwnOutfit };
   if (profileUrl)  updates.profile_photo  = profileUrl;
   if (ethnicity)   updates.ethnicity      = ethnicity;
   if (hairTexture) updates.hair_texture   = hairTexture;
@@ -313,6 +373,7 @@ async function signUpExistingModel(username, pin) {
   const sel = document.getElementById('signup-name');
   const modelFullName = sel.options[sel.selectedIndex]?.text || String(nameVal);
   if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, modelFullName);
+  clearPendingFiles('ex-face','ex-fit','ex-hair','ex-mua','ex-outfit','ex-current-hair');
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
@@ -328,10 +389,9 @@ async function signUpNewModel(username, pin) {
   const fullName = document.getElementById('new-full-name').value.trim();
   if (!fullName) { showError('signup-error','Enter your full name.'); return; }
   // Face photo is required
-  const faceInp = document.getElementById('new-face1');
-  if (!faceInp || !faceInp.files[0]) {
+  if (!chosenFiles('new-face1').length) {
     showError('signup-error','Please upload your face close-up photo — it\'s required to complete sign-up.');
-    faceInp?.scrollIntoView({ behavior:'smooth', block:'center' });
+    document.getElementById('new-face1')?.scrollIntoView({ behavior:'smooth', block:'center' });
     return;
   }
   const { data:ex } = await sb.from('model_profiles').select('id').eq('username',username).maybeSingle();
@@ -346,13 +406,12 @@ async function signUpNewModel(username, pin) {
     const u = await uploadFiles([profInput.files[0]], folder, 'profile');
     if (u.length) profileUrl = u[0];
   }
-  const faceUrls = [];
-  const f1 = document.getElementById('new-face1');
-  if (f1 && f1.files[0]) { const u = await uploadFiles([f1.files[0]], folder, 'face', 1); faceUrls.push(...u); }
-  const fitUrls    = await uploadFiles(document.getElementById('new-fit').files,         folder, 'fit', 3);
-  const hairUrls   = await uploadFiles(document.getElementById('new-hair-photos').files, folder, 'hair', 3);
-  const muaUrls    = await uploadFiles(document.getElementById('new-mua-photos').files,  folder, 'mua', 3);
-  const outfitUrls = await uploadFiles(document.getElementById('new-outfit').files,      folder, 'outfit', 3);
+  const faceUrls    = await uploadFiles(chosenFiles('new-face1'),       folder, 'face', 1);
+  const fitUrls     = await uploadFiles(chosenFiles('new-fit'),         folder, 'fit', 3);
+  const hairUrls    = await uploadFiles(chosenFiles('new-hair-photos'), folder, 'hair', 3);
+  const muaUrls     = await uploadFiles(chosenFiles('new-mua-photos'),  folder, 'mua', 3);
+  const outfitUrls  = await uploadFiles(chosenFiles('new-outfit'),      folder, 'outfit', 3);
+  const curHairUrls = await uploadFiles(chosenFiles('new-current-hair'),folder, 'current_hair', 3);
 
   const culturalVal = document.getElementById('new-cultural').value; // 'no' | 'have' | 'try'
 
@@ -384,6 +443,7 @@ async function signUpNewModel(username, pin) {
     username, pin, registered:true, approved:true,
     profile_photo: profileUrl, face_photos:faceUrls,
     photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls,
+    current_hair_photos:curHairUrls,
     tags:[], notes:'',
     needs_hair:true, needs_makeup:true,
     checklist_outfit:false, checklist_hair:false, checklist_makeup:false,
@@ -392,6 +452,7 @@ async function signUpNewModel(username, pin) {
   const { error } = await sb.from('model_profiles').insert(payload);
   if (error) { showError('signup-error',error.message); return; }
   if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, fullName);
+  clearPendingFiles('new-face1','new-fit','new-hair-photos','new-mua-photos','new-outfit','new-current-hair');
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
@@ -522,6 +583,8 @@ async function setAdminTab(btn, tab) {
 }
 
 function isCompleted(m) { return m.checklist_outfit && m.checklist_hair && m.checklist_makeup; }
+// A model counts as "signed up" once registered with a face photo, or admin-marked complete
+function isSignupComplete(m) { return (m.registered && toArr(m.face_photos).length > 0) || !!m.signup_manually_complete; }
 
 function renderAdminModels(search) {
   let list = allModels;
@@ -688,8 +751,8 @@ function modelCardHTML(m, viewerRole) {
   const genderBadge = m.gender ? `<span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender}</span>` : '';
   const igBadge     = m.instagram ? `<span class="badge badge-outline">@${m.instagram}</span>` : '';
   const ethBadge    = m.ethnicity ? `<span class="badge badge-outline">${flag} ${m.ethnicity}</span>` : '';
-  const isSignupComplete = (m.registered && toArr(m.face_photos).length > 0) || m.signup_manually_complete;
-  const signupBadge = isSignupComplete
+  const signupComplete = isSignupComplete(m);
+  const signupBadge = signupComplete
     ? `<span class="badge badge-green">✓ Signed Up</span>`
     : `<span class="badge badge-outline" style="color:#b45309;border-color:#f6d28b;background:#fffbeb">⏳ Not Signed Up</span>`;
 
@@ -834,11 +897,12 @@ async function openModelPanel(id) {
   const role    = currentUser?.role;
   const isAdmin = role==='ADMIN';
   const isHairOrMua = role==='HAIR_STYLIST' || role==='MAKEUP_ARTIST';
-  const photos  = toArr(m.photos);
-  const hairPh  = toArr(m.hair_photos);
-  const muaPh   = toArr(m.mua_photos);
-  const facePh  = toArr(m.face_photos);
-  const tags    = toArr(m.tags);
+  const photos    = toArr(m.photos);
+  const hairPh    = toArr(m.hair_photos);
+  const muaPh     = toArr(m.mua_photos);
+  const facePh    = toArr(m.face_photos);
+  const curHairPh = toArr(m.current_hair_photos);
+  const tags      = toArr(m.tags);
   const modelInv = inventoryData.filter(i=>i.assigned_model===m.full_name);
 
   // ── Status action buttons (staff only) ──
@@ -930,7 +994,8 @@ async function openModelPanel(id) {
       <button class="collapse-btn" onclick="toggleCollapse(this)">💇 Hair and Make Up Info <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
         ${hairInfoCard}
-        <div class="panel-section-title" style="margin-top:4px">Hair Inspo</div>${photoGrid(hairPh)}
+        <div class="panel-section-title" style="margin-top:4px">Current Hairstyle</div>${photoGrid(curHairPh)}
+        <div class="panel-section-title" style="margin-top:16px">Hair Inspo</div>${photoGrid(hairPh)}
         <div class="panel-section-title" style="margin-top:16px">Makeup Inspo</div>${photoGrid(muaPh)}
       </div>
     </div>`;
@@ -1007,6 +1072,7 @@ async function openModelPanel(id) {
       <div class="panel-section-title">Internal Notes</div>
       <textarea class="notes-field" id="panel-notes" maxlength="2000" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
     </div>
+    ${adminTasksBlock(m)}
     <div>
       <button class="btn btn-sm btn-ghost" onclick="resetModelPin('${m.id}','${(m.full_name||'').replace(/'/g,"\\'")}')">🔑 Reset PIN</button>
       <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Generates a new 4-digit PIN for this model — give it to them so they can log back in.</div>
@@ -1411,10 +1477,25 @@ async function deleteInvItem(itemId) {
 // EDIT DETAILS PANEL (model self-edit)
 // ═══════════════════════════════════════════════
 let editDetailsModelId = null;
+let editDetailsModel   = null; // full model row, used for existing-photo removal
+
+// Which DB photo array maps to which "existing photos" container in the Edit panel
+const EDIT_PHOTO_SECTIONS = [
+  { field:'face_photos',         container:'edit-existing-face'    },
+  { field:'photos',              container:'edit-existing-fit'     },
+  { field:'hair_photos',         container:'edit-existing-hair'    },
+  { field:'mua_photos',          container:'edit-existing-mua'     },
+  { field:'outfit_photos',       container:'edit-existing-outfit'  },
+  { field:'current_hair_photos', container:'edit-existing-curhair' },
+];
 
 function openEditDetails(model) {
   editDetailsModelId = model.id;
+  editDetailsModel   = model;
   editProfileFile = null; // reset any previously staged photo
+  // Reset any photos staged but not saved from a previous open
+  clearPendingFiles('edit-face-upload','edit-fit-upload','edit-hair-upload','edit-mua-upload','edit-outfit-upload','edit-curhair-upload');
+  renderEditExistingPhotos(model);
 
   // Profile photo preview
   const prev = document.getElementById('edit-profile-preview');
@@ -1470,6 +1551,55 @@ function openEditDetails(model) {
 function closeEditDetails() {
   document.getElementById('edit-details-overlay').classList.add('hidden');
   document.body.style.overflow = 'hidden'; // model dashboard keeps body locked
+}
+
+// Render each photo array as removable thumbnails inside the Edit panel
+function renderEditExistingPhotos(model) {
+  EDIT_PHOTO_SECTIONS.forEach(({ field, container }) => {
+    const wrap = document.getElementById(container);
+    if (!wrap) return;
+    const urls = toArr(model[field]);
+    if (!urls.length) { wrap.innerHTML = ''; return; }
+    wrap.innerHTML = `<div class="edit-existing-label">Tap × to permanently remove a photo</div>` +
+      urls.map(u => `<div class="file-chip"><img src="${u}" alt=""/><button type="button" class="file-chip-x" onclick="removeExistingPhoto('${field}','${u.replace(/'/g,"\\'")}')">×</button></div>`).join('');
+  });
+}
+
+// Convert a public storage URL back to its bucket path for deletion
+function storagePathFromUrl(url) {
+  const marker = '/model-photos/';
+  const i = url.indexOf(marker);
+  return i > -1 ? url.slice(i + marker.length) : null;
+}
+
+// Permanently remove one already-saved photo: unlink from the profile array,
+// delete the file from storage, and (for own-outfit photos) drop its inventory row.
+async function removeExistingPhoto(field, url) {
+  if (!editDetailsModel) return;
+  if (!confirm('Remove this photo? It will be permanently deleted.')) return;
+  const newArr = toArr(editDetailsModel[field]).filter(u => u !== url);
+  const { error } = await sb.from('model_profiles').update({ [field]: newArr }).eq('id', editDetailsModelId);
+  if (error) { toast(error.message, true); return; }
+
+  // Keep caches in sync
+  editDetailsModel[field] = newArr;
+  if (currentModelData && String(currentModelData.id) === String(editDetailsModelId)) currentModelData[field] = newArr;
+  const cached = allModels.find(x => String(x.id) === String(editDetailsModelId));
+  if (cached) cached[field] = newArr;
+
+  // Delete the underlying file so storage doesn't keep piling up
+  const path = storagePathFromUrl(url);
+  if (path) await sb.storage.from('model-photos').remove([path]);
+
+  // Own-outfit photos also live in inventory — remove the matching item
+  if (field === 'outfit_photos') {
+    await sb.from('inventory').delete().eq('photo_url', url);
+    const { data: invData } = await sb.from('inventory').select('*').order('created_at', { ascending: false });
+    if (invData) inventoryData = invData;
+  }
+
+  renderEditExistingPhotos(editDetailsModel);
+  toast('Photo removed');
 }
 
 function toggleEditCultural(val) {
@@ -1538,28 +1668,26 @@ async function saveEditDetails() {
 
   // Only fetch current photo arrays if at least one photo input has files
   const photoFields = [
-    { inputId: 'edit-face-upload',   field: 'face_photos',   statusId: 'edit-face-status',   folder: 'face',   max: 3 },
-    { inputId: 'edit-fit-upload',    field: 'photos',        statusId: 'edit-fit-status',    folder: 'fit',    max: 3 },
-    { inputId: 'edit-hair-upload',   field: 'hair_photos',   statusId: 'edit-hair-status',   folder: 'hair',   max: 3 },
-    { inputId: 'edit-mua-upload',    field: 'mua_photos',    statusId: 'edit-mua-status',    folder: 'mua',    max: 3 },
-    { inputId: 'edit-outfit-upload', field: 'outfit_photos', statusId: 'edit-outfit-status', folder: 'outfit', max: 3 },
+    { inputId: 'edit-face-upload',    field: 'face_photos',         statusId: 'edit-face-status',    folder: 'face',         max: 3 },
+    { inputId: 'edit-fit-upload',     field: 'photos',              statusId: 'edit-fit-status',     folder: 'fit',          max: 3 },
+    { inputId: 'edit-hair-upload',    field: 'hair_photos',         statusId: 'edit-hair-status',    folder: 'hair',         max: 3 },
+    { inputId: 'edit-mua-upload',     field: 'mua_photos',          statusId: 'edit-mua-status',     folder: 'mua',          max: 3 },
+    { inputId: 'edit-outfit-upload',  field: 'outfit_photos',       statusId: 'edit-outfit-status',  folder: 'outfit',       max: 3 },
+    { inputId: 'edit-curhair-upload', field: 'current_hair_photos', statusId: 'edit-curhair-status', folder: 'current_hair', max: 3 },
   ];
-  const hasNewPhotos = photoFields.some(({ inputId }) => {
-    const el = document.getElementById(inputId);
-    return el && el.files.length > 0;
-  });
+  const hasNewPhotos = photoFields.some(({ inputId }) => chosenFiles(inputId).length > 0);
 
   if (hasNewPhotos) {
     // Fetch existing arrays once, then upload each field in parallel
     const { data: currentModel } = await sb.from('model_profiles')
-      .select('face_photos,photos,hair_photos,mua_photos,outfit_photos')
+      .select('face_photos,photos,hair_photos,mua_photos,outfit_photos,current_hair_photos')
       .eq('id', editDetailsModelId).single();
 
     const newOutfitUrls = []; // track newly uploaded outfit photos for inventory
     await Promise.all(photoFields.map(async ({ inputId, field, statusId, folder, max }) => {
-      const input = document.getElementById(inputId);
-      if (!input || !input.files.length) return;
-      const uploaded = await uploadFiles(Array.from(input.files), editDetailsModelId, folder, max);
+      const files = chosenFiles(inputId);
+      if (!files.length) return;
+      const uploaded = await uploadFiles(files, editDetailsModelId, folder, max);
       if (uploaded.length) {
         updates[field] = [...toArr(currentModel?.[field]), ...uploaded];
         const statusEl = document.getElementById(statusId);
@@ -1606,6 +1734,7 @@ async function saveEditDetails() {
   const fresh = updateData[0];
   const idx = allModels.findIndex(m => String(m.id) === String(editDetailsModelId));
   if (idx !== -1) allModels[idx] = fresh; else allModels.push(fresh);
+  clearPendingFiles('edit-face-upload','edit-fit-upload','edit-hair-upload','edit-mua-upload','edit-outfit-upload','edit-curhair-upload');
   toast('Details saved ✓');
   closeEditDetails();
   showModelDashboard(fresh);
@@ -1637,6 +1766,8 @@ async function showModelDashboard(model) {
   const hairPh    = toArr(model.hair_photos);
   const muaPh     = toArr(model.mua_photos);
   const outfitPh  = toArr(model.outfit_photos);
+  const curHairPh = toArr(model.current_hair_photos);
+  const pendingCount = pendingTasks(model).length;
 
   document.getElementById('model-profile-wrap').innerHTML = `
     <div class="model-profile-hero">
@@ -1651,6 +1782,11 @@ async function showModelDashboard(model) {
       </div>
     </div>
     <div class="model-profile-body">
+      ${pendingCount ? `<button class="tasks-banner" onclick="openModelTaskPanel()">
+        <span class="tasks-banner-icon">📋</span>
+        <span class="tasks-banner-text"><strong>Tasks to Complete</strong><span>${pendingCount} thing${pendingCount!==1?'s':''} the team need${pendingCount===1?'s':''} from you — tap to finish</span></span>
+        <span class="tasks-banner-count">${pendingCount}</span>
+      </button>` : ''}
       <div class="model-section">
         <div class="model-section-title">Your Team</div>
         <div class="model-team-cards">
@@ -1665,6 +1801,7 @@ async function showModelDashboard(model) {
         <div class="model-section-title">Add More Photos</div>
         <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Add to your base fits, hair inspo, makeup inspo, or your own outfit any time.</p>
         <div class="upload-grid">
+          <div><label style="margin-bottom:8px">Current Hairstyle</label><div class="upload-zone" onclick="document.getElementById('up-curhair').click()"><input type="file" id="up-curhair" multiple accept="image/*" onchange="uploadMorePhotos(this,'current_hair_photos','${model.id}')"/><div class="upload-zone-icon">💇‍♀️</div><div class="upload-zone-text">Tap to upload</div></div></div>
           <div><label style="margin-bottom:8px">Base Fits</label><div class="upload-zone" onclick="document.getElementById('up-fit').click()"><input type="file" id="up-fit" multiple accept="image/*" onchange="uploadMorePhotos(this,'photos','${model.id}')"/><div class="upload-zone-icon">📸</div><div class="upload-zone-text">Tap to upload</div></div></div>
           <div><label style="margin-bottom:8px">Hair Inspo</label><div class="upload-zone" onclick="document.getElementById('up-hair').click()"><input type="file" id="up-hair" multiple accept="image/*" onchange="uploadMorePhotos(this,'hair_photos','${model.id}')"/><div class="upload-zone-icon">💇</div><div class="upload-zone-text">Tap to upload</div></div></div>
           <div><label style="margin-bottom:8px">Makeup Inspo</label><div class="upload-zone" onclick="document.getElementById('up-mua').click()"><input type="file" id="up-mua" multiple accept="image/*" onchange="uploadMorePhotos(this,'mua_photos','${model.id}')"/><div class="upload-zone-icon">💄</div><div class="upload-zone-text">Tap to upload</div></div></div>
@@ -1674,6 +1811,7 @@ async function showModelDashboard(model) {
       </div>
       ${outfitPh.length?`<div class="model-section"><div class="model-section-title">Your Own Outfit</div><div class="photo-grid">${outfitPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${photos.length?`<div class="model-section"><div class="model-section-title">Your Fits</div><div class="photo-grid">${photos.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
+      ${curHairPh.length?`<div class="model-section"><div class="model-section-title">Current Hairstyle</div><div class="photo-grid">${curHairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${hairPh.length?`<div class="model-section"><div class="model-section-title">Hair Inspo</div><div class="photo-grid">${hairPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
       ${muaPh.length?`<div class="model-section"><div class="model-section-title">Makeup Inspo</div><div class="photo-grid">${muaPh.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div></div>`:''}
     </div>`;
@@ -1691,6 +1829,218 @@ async function uploadMorePhotos(input, field, modelId) {
   // reload model dashboard
   const { data:fresh }=await sb.from('model_profiles').select('*').eq('id',modelId).single();
   if (fresh) showModelDashboard(fresh);
+}
+
+// ═══════════════════════════════════════════════
+// TASK SYSTEM
+// Admin assigns "tasks" (real profile fields/uploads) to already-signed-up
+// models. Models see a "Tasks to Complete" button and fill only those items.
+// A model's `tasks` column = [{ key, note, done, assigned_at }].
+// ═══════════════════════════════════════════════
+const TASK_REGISTRY = [
+  { key:'current_hair', icon:'💇‍♀️', label:'Upload current hairstyle photos',  type:'photos', field:'current_hair_photos', max:3 },
+  { key:'face',         icon:'👤',   label:'Upload face close-up photo',       type:'photos', field:'face_photos',         max:1 },
+  { key:'hair_inspo',   icon:'💇',   label:'Upload hair inspo photos',         type:'photos', field:'hair_photos',         max:3 },
+  { key:'mua_inspo',    icon:'💄',   label:'Upload makeup inspo photos',       type:'photos', field:'mua_photos',          max:3 },
+  { key:'fits',         icon:'📸',   label:'Upload outfit inspo photos',       type:'photos', field:'photos',              max:3 },
+  { key:'outfit',       icon:'👕',   label:'Upload your own outfit photos',    type:'photos', field:'outfit_photos',       max:3 },
+  { key:'hair_texture', icon:'🧬',   label:'Tell us your hair texture',        type:'select', field:'hair_texture', options:['1A','1B','1C','2A','2B','2C','3A','3B','3C','4A','4B','4C'] },
+  { key:'hair_length',  icon:'📏',   label:'Tell us your hair length',         type:'select', field:'hair_length',  options:['Short','Medium','Long'] },
+  { key:'makeup_self',  icon:'💋',   label:'Can you do your own makeup?',      type:'boolselect', field:'makeup_self' },
+  { key:'height',       icon:'📐',   label:'Tell us your height',              type:'text',   field:'height',    placeholder:'e.g. 180cm' },
+  { key:'top_size',     icon:'👕',   label:'Tell us your top size',            type:'text',   field:'top_size',  placeholder:'e.g. M' },
+  { key:'jean_size',    icon:'👖',   label:'Tell us your jean size',           type:'text',   field:'jean_size', placeholder:'e.g. 32' },
+];
+function taskReg(key) { return TASK_REGISTRY.find(r => r.key === key); }
+function toTasks(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
+  return [];
+}
+function pendingTasks(m) { return toTasks(m?.tasks).filter(t => !t.done && taskReg(t.key)); }
+
+// ── ADMIN: assign-task modal (single model or bulk to all signed-up) ──
+let _taskMode = 'single', _taskModelId = null;
+
+function openTaskModal(mode, modelId) {
+  _taskMode = mode; _taskModelId = modelId || null;
+  const overlay = document.getElementById('task-modal-overlay');
+  if (!overlay) return;
+  const signedUp = allModels.filter(isSignupComplete);
+  const title = document.getElementById('task-modal-title');
+  const sub   = document.getElementById('task-modal-sub');
+  if (mode === 'bulk') {
+    title.textContent = 'Assign Task to All';
+    sub.textContent = `Adds the selected task(s) to all ${signedUp.length} signed-up model${signedUp.length!==1?'s':''}. Models who already finished a task keep their answer.`;
+  } else {
+    const m = allModels.find(x => String(x.id) === String(modelId));
+    title.textContent = 'Assign Task';
+    sub.textContent = `For ${(m?.full_name||'this model').split(' ')[0]} — they'll see a "Tasks to Complete" button next time they sign in.`;
+  }
+  document.getElementById('task-modal-list').innerHTML = TASK_REGISTRY.map(r =>
+    `<label class="task-pick"><input type="checkbox" value="${r.key}"/><span>${r.icon} ${r.label}</span></label>`).join('');
+  document.getElementById('task-modal-note').value = '';
+  overlay.classList.remove('hidden');
+}
+function closeTaskModal(e) {
+  if (e && e.target.id !== 'task-modal-overlay') return;
+  document.getElementById('task-modal-overlay').classList.add('hidden');
+}
+function mergeTasks(existing, newOnes) {
+  const keys = new Set(newOnes.map(t => t.key));
+  return [...toTasks(existing).filter(t => !keys.has(t.key)), ...newOnes];
+}
+async function submitTaskAssign() {
+  const keys = Array.from(document.querySelectorAll('#task-modal-list input:checked')).map(c => c.value);
+  if (!keys.length) { toast('Pick at least one task', true); return; }
+  const note = document.getElementById('task-modal-note').value.trim();
+  const stamp = new Date().toISOString();
+  const newOnes = keys.map(key => ({ key, note, done:false, assigned_at:stamp }));
+
+  if (_taskMode === 'bulk') {
+    const targets = allModels.filter(isSignupComplete);
+    await Promise.all(targets.map(async m => {
+      const merged = mergeTasks(m.tasks, newOnes);
+      const { error } = await sb.from('model_profiles').update({ tasks: merged }).eq('id', m.id);
+      if (!error) m.tasks = merged;
+    }));
+    toast(`Task assigned to ${targets.length} model${targets.length!==1?'s':''} ✓`);
+  } else {
+    const m = allModels.find(x => String(x.id) === String(_taskModelId));
+    const merged = mergeTasks(m?.tasks, newOnes);
+    const { error } = await sb.from('model_profiles').update({ tasks: merged }).eq('id', _taskModelId);
+    if (error) { toast(error.message, true); return; }
+    if (m) m.tasks = merged;
+    if (openModelData && String(openModelData.id) === String(_taskModelId)) openModelData.tasks = merged;
+    toast('Task assigned ✓');
+  }
+  document.getElementById('task-modal-overlay').classList.add('hidden');
+  if (_taskMode === 'single' && _taskModelId) openModelPanel(_taskModelId);
+  refreshCurrentView();
+}
+async function removeTaskFromModel(modelId, key) {
+  const m = allModels.find(x => String(x.id) === String(modelId)) || openModelData;
+  const newTasks = toTasks(m?.tasks).filter(t => t.key !== key);
+  const { error } = await sb.from('model_profiles').update({ tasks: newTasks }).eq('id', modelId);
+  if (error) { toast(error.message, true); return; }
+  if (m) m.tasks = newTasks;
+  if (openModelData && String(openModelData.id) === String(modelId)) openModelData.tasks = newTasks;
+  openModelPanel(modelId);
+  toast('Task removed');
+}
+// Admin panel block: current tasks + assign button
+function adminTasksBlock(m) {
+  const tasks = toTasks(m.tasks);
+  const rows = tasks.length ? tasks.map(t => {
+    const reg = taskReg(t.key);
+    const label = reg ? `${reg.icon} ${reg.label}` : t.key;
+    const status = t.done ? `<span class="task-status done">✓ Done</span>` : `<span class="task-status pending">◷ Pending</span>`;
+    return `<div class="task-admin-row">
+      <div><div class="task-admin-label">${label}</div>${t.note?`<div class="task-admin-note">"${t.note}"</div>`:''}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${status}<button class="task-remove-x" title="Remove" onclick="removeTaskFromModel('${m.id}','${t.key}')">×</button></div>
+    </div>`;
+  }).join('') : '<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">No tasks assigned.</div>';
+  return `
+    <div>
+      <div class="panel-section-title">Tasks</div>
+      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-4px 0 12px">Assign things for this model to complete themselves — they'll get a "Tasks to Complete" button on sign-in.</p>
+      <div class="task-admin-list">${rows}</div>
+      <button class="btn btn-sm btn-brown" style="width:auto;margin-top:12px" onclick="openTaskModal('single','${m.id}')">+ Assign Task</button>
+    </div>`;
+}
+
+// ── MODEL: complete assigned tasks ──
+function openModelTaskPanel() {
+  const m = currentModelData;
+  if (!m) return;
+  const tasks = pendingTasks(m);
+  if (!tasks.length) { toast('No tasks to complete 🎉'); return; }
+  const body = tasks.map(t => {
+    const reg = taskReg(t.key);
+    let input = '';
+    if (reg.type === 'photos') {
+      input = `
+        <div class="upload-zone" onclick="document.getElementById('task-${reg.key}').click()">
+          <input type="file" id="task-${reg.key}" multiple accept="image/*" style="display:none" onchange="pickFiles('task-${reg.key}',${reg.max})"/>
+          <div class="upload-zone-icon">${reg.icon}</div>
+          <div class="upload-zone-text">Tap to upload</div>
+        </div>
+        <div class="file-previews" id="task-${reg.key}-previews"></div>`;
+    } else if (reg.type === 'select') {
+      input = `<div class="select-wrap"><select id="taskinput-${reg.key}"><option value="">— select —</option>${reg.options.map(o=>`<option value="${o}"${m[reg.field]===o?' selected':''}>${o}</option>`).join('')}</select></div>`;
+    } else if (reg.type === 'boolselect') {
+      const cur = m[reg.field]===true?'true':m[reg.field]===false?'false':'';
+      input = `<div class="select-wrap"><select id="taskinput-${reg.key}"><option value="">— select —</option><option value="true"${cur==='true'?' selected':''}>Yes</option><option value="false"${cur==='false'?' selected':''}>No</option></select></div>`;
+    } else { // text
+      input = `<input id="taskinput-${reg.key}" placeholder="${reg.placeholder||''}" value="${m[reg.field]||''}"/>`;
+    }
+    return `<div class="task-todo">
+      <div class="task-todo-title">${reg.icon} ${reg.label}</div>
+      ${t.note?`<div class="task-todo-note">📌 ${t.note}</div>`:''}
+      ${input}
+    </div>`;
+  }).join('');
+  document.getElementById('task-panel-body').innerHTML = body;
+  document.getElementById('task-panel-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+function closeModelTaskPanel() {
+  document.getElementById('task-panel-overlay').classList.add('hidden');
+  document.body.style.overflow = 'hidden'; // dashboard keeps body locked
+}
+async function submitModelTasks() {
+  const modelId = currentModelData?.id;
+  if (!modelId) return;
+  const saveBtn = document.getElementById('task-panel-save');
+  if (saveBtn) { saveBtn.textContent = 'Saving…'; saveBtn.disabled = true; }
+
+  const { data: model } = await sb.from('model_profiles').select('*').eq('id', modelId).single();
+  const tasks = toTasks(model.tasks);
+  const updates = {};
+  const newOutfitUrls = [];
+
+  for (const t of tasks) {
+    if (t.done) continue;
+    const reg = taskReg(t.key);
+    if (!reg) continue;
+    if (reg.type === 'photos') {
+      const files = chosenFiles('task-' + reg.key);
+      if (files.length) {
+        const uploaded = await uploadFiles(files, modelId, reg.field, reg.max);
+        if (uploaded.length) {
+          const existing = toArr(updates[reg.field] ?? model[reg.field]);
+          updates[reg.field] = [...existing, ...uploaded];
+          if (reg.field === 'outfit_photos') newOutfitUrls.push(...uploaded);
+          t.done = true;
+        }
+      } else if (toArr(model[reg.field]).length) {
+        t.done = true; // already satisfied
+      }
+    } else if (reg.type === 'boolselect') {
+      const v = document.getElementById('taskinput-' + reg.key)?.value;
+      if (v === 'true' || v === 'false') { updates[reg.field] = v === 'true'; t.done = true; }
+    } else { // select or text
+      const v = (document.getElementById('taskinput-' + reg.key)?.value || '').trim();
+      if (v) { updates[reg.field] = v; t.done = true; }
+    }
+  }
+  updates.tasks = tasks;
+
+  const { error, data } = await sb.from('model_profiles').update(updates).eq('id', modelId).select();
+  if (saveBtn) { saveBtn.textContent = 'Done'; saveBtn.disabled = false; }
+  if (error) { toast(error.message, true); return; }
+
+  if (newOutfitUrls.length && model.full_name) {
+    await addOutfitsToInventory(newOutfitUrls, model.full_name);
+    const { data: invData } = await sb.from('inventory').select('*').order('created_at', { ascending: false });
+    if (invData) inventoryData = invData;
+  }
+
+  clearPendingFiles(...TASK_REGISTRY.filter(r=>r.type==='photos').map(r=>'task-'+r.key));
+  const stillPending = toTasks((data&&data[0])?.tasks).filter(t=>!t.done).length;
+  toast(stillPending ? 'Saved ✓ — some tasks still pending' : 'All tasks complete 🎉');
+  closeModelTaskPanel();
+  if (data && data[0]) showModelDashboard(data[0]);
 }
 
 // ═══════════════════════════════════════════════
