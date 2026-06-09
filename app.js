@@ -444,6 +444,11 @@ async function loadStaffUsers() {
   staffUsers = data || [];
 }
 function staffNamesFor(role) {
+  // Use STAFF_NAMES as the canonical list — this ensures admins with dual roles
+  // (e.g. Daniel who is ADMIN but also a STYLIST) always appear in dropdowns.
+  // Fall back to DB staffUsers if a role isn't in STAFF_NAMES.
+  const canonical = STAFF_NAMES[role];
+  if (canonical && canonical.length) return canonical;
   return staffUsers.filter(s=>s.role===role).map(s=>s.name);
 }
 
@@ -523,8 +528,16 @@ function renderAdminModels(search) {
   }
   if (activeTab==='completed') list = list.filter(m=>isCompleted(m));
   if (activeTab==='mymodels') list = list.filter(m=>m.assigned_stylist===currentUser?.name);
-  renderSignedUpPanel();
-  renderDanielPanel();
+  // Sign Up Tracker only on All tab
+  if (activeTab === 'all') {
+    renderSignedUpPanel();
+  } else {
+    const p = document.getElementById('signed-up-panel');
+    if (p) p.innerHTML = '';
+  }
+  // Daniel panel removed — use the My Models tab instead
+  const dp = document.getElementById('daniel-panel');
+  if (dp) dp.innerHTML = '';
   const grid = document.getElementById('admin-model-grid');
   if (!grid) return;
   grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,'ADMIN')).join('') : '<div class="loading-center" style="grid-column:1/-1">No models here</div>';

@@ -531,9 +531,14 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   position: fixed;
   bottom: 28px;
   left: 28px;
+  /* Force GPU layer so iOS Safari doesn't drop the element during scroll */
   -webkit-transform: translate3d(0, 0, 0);
   transform: translate3d(0, 0, 0);
   -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+  /* Keep it above everything including browser chrome */
+  z-index: 9999;
   width: 50px;
   height: 50px;
   border-radius: 50%;
@@ -546,12 +551,15 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(0,0,0,.45);
-  z-index: 400;
-  transition: background .2s, border-color .2s, transform .1s;
+  /* Only transition color, NOT transform — avoids overriding the GPU layer */
+  transition: background .2s, border-color .2s;
   line-height: 1;
+  /* Prevent iOS tap highlight */
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .panel-back-btn:hover { background: var(--brown); border-color: var(--brown); }
-.panel-back-btn:active { transform: scale(.94); }
+.panel-back-btn:active { opacity: .75; }
 
 /* ── MANAGE USERS ── */
 .manage-users-list { display: flex; flex-direction: column; gap: 8px; }

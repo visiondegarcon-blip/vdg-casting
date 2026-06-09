@@ -594,7 +594,6 @@
       <div class="topbar">
         <div class="topbar-title" id="staff-page-title">All Models</div>
         <div class="topbar-actions">
-          <input type="text" class="search-input" placeholder="Search…" oninput="filterStaffModels(this.value)"/>
         </div>
       </div>
       <div class="panel-content">
@@ -604,6 +603,10 @@
           <button class="tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>
         </div>
         <div id="staff-models-content">
+          <!-- Search sits directly above the model list so it's visible without scrolling up -->
+          <div id="staff-search-wrap" style="margin-bottom:14px">
+            <input type="text" class="search-input" placeholder="Search models…" oninput="filterStaffModels(this.value)" style="width:100%;box-sizing:border-box"/>
+          </div>
           <div class="model-grid" id="staff-model-grid"></div>
         </div>
         <div id="staff-inventory-content" class="hidden">
