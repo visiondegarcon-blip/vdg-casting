@@ -223,6 +223,7 @@
                     <input type="hidden" id="ex-hair-length-group-val" value=""/>
                   </div>
                 </div>
+                <div id="signup-custom-official-existing"></div>
                 <div class="form-group">
                   <label>Notes (optional)</label>
                   <textarea id="ex-note" placeholder="Anything you want the hair, makeup or styling team to know…"></textarea>
@@ -498,6 +499,7 @@
                 </div>
                 <div class="file-previews" id="new-mua-photos-previews"></div>
               </div>
+              <div id="signup-custom-official-new"></div>
               <div class="form-group">
                 <label>Notes (optional)</label>
                 <textarea id="new-note" placeholder="Anything for the hair, makeup or styling team…"></textarea>
@@ -887,6 +889,8 @@
           <input type="checkbox" id="edit-no-own-outfit" style="width:18px;height:18px;min-width:18px;cursor:pointer;accent-color:var(--brown);margin-top:1px" onclick="event.stopPropagation()"/>
           <span style="font-size:13px;font-family:var(--font-body);color:var(--text);line-height:1.4">I don't have any foundation outfits or any accessories to bring</span>
         </div>
+        <!-- Custom Official Questions -->
+        <div id="edit-custom-official"></div>
         <!-- Notes -->
         <div class="form-group"><label>Notes for the team</label><textarea id="edit-model-note" maxlength="500" placeholder="Anything for the hair, makeup or styling team…" rows="3"></textarea></div>
 
@@ -1007,7 +1011,7 @@
       </div>
       <div class="modal-body">
         <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin:0 0 16px">
-          Custom questions you create here show up in the "Assign Task" list. Models answer them inside Tasks to Complete.
+          Custom questions you create here show up in the "Assign Task" list. Mark as "Official" to also add them to the signup form and Edit Details.
         </p>
         <div id="custom-tasks-list" style="margin-bottom:20px"></div>
 
@@ -1040,6 +1044,15 @@
             <label>Placeholder (optional)</label>
             <input id="ct-placeholder" placeholder="e.g. describe your shoes"/>
           </div>
+          <div class="form-group">
+            <label>Save as</label>
+            <div class="select-wrap">
+              <select id="ct-official">
+                <option value="false">Assignable task only</option>
+                <option value="true">Official question (signup + edit details)</option>
+              </select>
+            </div>
+          </div>
           <button class="btn btn-brown" onclick="addCustomTask()">+ Add Question</button>
         </div>
       </div>
@@ -1069,6 +1082,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

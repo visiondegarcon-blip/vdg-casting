@@ -207,6 +207,10 @@ async function loadSignupNames() {
     sel.innerHTML = '<option value="">— choose your name —</option>';
     (data||[]).forEach(m => { sel.innerHTML += `<option value="${m.id}">${m.full_name}</option>`; });
     document.getElementById('existing-model-extras').classList.add('hidden');
+    // Load custom tasks and render official questions in both signup forms
+    if (!customTaskDefs.length) await loadCustomTasks();
+    renderOfficialCustomQuestions('signup-custom-official-existing', 'ex-custom', null);
+    renderOfficialCustomQuestions('signup-custom-official-new', 'new-custom', null);
     return;
   }
 
@@ -361,7 +365,13 @@ async function signUpExistingModel(username, pin) {
   const hairLength  = document.getElementById('ex-hair-length-group-val')?.value || '';
   const noOwnOutfit = document.getElementById('ex-no-own-outfit')?.checked || false;
 
+  // Collect official custom question answers
+  let customFields = collectOfficialCustomFields('ex-custom', {});
+  const { cf: cfAfterPhotos, inputIds: customPhotoIds } = await uploadOfficialCustomPhotos('ex-custom', nameVal, customFields);
+  customFields = cfAfterPhotos;
+
   const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, current_hair_photos:curHairUrls, model_note:note, needs_hair:true, needs_makeup:true, no_own_outfit:noOwnOutfit };
+  if (Object.keys(customFields).length) updates.custom_fields = customFields;
   if (profileUrl)  updates.profile_photo  = profileUrl;
   if (ethnicity)   updates.ethnicity      = ethnicity;
   if (hairTexture) updates.hair_texture   = hairTexture;
@@ -374,7 +384,7 @@ async function signUpExistingModel(username, pin) {
   const sel = document.getElementById('signup-name');
   const modelFullName = sel.options[sel.selectedIndex]?.text || String(nameVal);
   if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, modelFullName);
-  clearPendingFiles('ex-face','ex-fit','ex-hair','ex-mua','ex-outfit','ex-current-hair');
+  clearPendingFiles('ex-face','ex-fit','ex-hair','ex-mua','ex-outfit','ex-current-hair', ...customPhotoIds);
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
@@ -416,6 +426,9 @@ async function signUpNewModel(username, pin) {
 
   const culturalVal = document.getElementById('new-cultural').value; // 'no' | 'have' | 'try'
 
+  // Collect official custom question answers (text/select/bool — photos need an ID so we handle post-insert)
+  let customFields = collectOfficialCustomFields('new-custom', {});
+
   const payload = {
     full_name:     fullName,
     instagram:     document.getElementById('new-instagram').value.trim(),
@@ -449,11 +462,18 @@ async function signUpNewModel(username, pin) {
     needs_hair:true, needs_makeup:true,
     checklist_outfit:false, checklist_hair:false, checklist_makeup:false,
   };
+  if (Object.keys(customFields).length) payload.custom_fields = customFields;
 
-  const { error } = await sb.from('model_profiles').insert(payload);
+  const { error, data: insertedRows } = await sb.from('model_profiles').insert(payload).select();
   if (error) { showError('signup-error',error.message); return; }
+  // Upload custom photo questions now that we have the model ID
+  const newModelId = insertedRows?.[0]?.id || folder;
+  const { cf: cfAfterPhotos, inputIds: customPhotoIds } = await uploadOfficialCustomPhotos('new-custom', newModelId, insertedRows?.[0]?.custom_fields || customFields);
+  if (Object.keys(cfAfterPhotos).length > Object.keys(customFields).length) {
+    await sb.from('model_profiles').update({ custom_fields: cfAfterPhotos }).eq('id', newModelId);
+  }
   if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, fullName);
-  clearPendingFiles('new-face1','new-fit','new-hair-photos','new-mua-photos','new-outfit','new-current-hair');
+  clearPendingFiles('new-face1','new-fit','new-hair-photos','new-mua-photos','new-outfit','new-current-hair', ...customPhotoIds);
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
@@ -1491,7 +1511,7 @@ const EDIT_PHOTO_SECTIONS = [
   { field:'current_hair_photos', container:'edit-existing-curhair' },
 ];
 
-function openEditDetails(model) {
+async function openEditDetails(model) {
   editDetailsModelId = model.id;
   editDetailsModel   = model;
   editProfileFile = null; // reset any previously staged photo
@@ -1544,6 +1564,10 @@ function openEditDetails(model) {
       btn.classList.toggle('active', btn.textContent === model.hair_length);
     });
   }
+
+  // Render official custom questions
+  if (!customTaskDefs.length) await loadCustomTasks();
+  renderOfficialCustomQuestions('edit-custom-official', 'edit-custom', model);
 
   document.getElementById('edit-details-error').textContent = '';
   document.getElementById('edit-details-overlay').classList.remove('hidden');
@@ -1716,6 +1740,12 @@ async function saveEditDetails() {
     }
   }
 
+  // Collect official custom question answers
+  let editCustomFields = collectOfficialCustomFields('edit-custom', editDetailsModel?.custom_fields || {});
+  const { cf: editCfAfterPhotos, inputIds: editCustomPhotoIds } = await uploadOfficialCustomPhotos('edit-custom', editDetailsModelId, editCustomFields);
+  editCustomFields = editCfAfterPhotos;
+  if (Object.keys(editCustomFields).length) updates.custom_fields = editCustomFields;
+
   const { error, data: updateData, count } = await sb.from('model_profiles')
     .update(updates)
     .eq('id', editDetailsModelId)
@@ -1736,7 +1766,7 @@ async function saveEditDetails() {
   const fresh = updateData[0];
   const idx = allModels.findIndex(m => String(m.id) === String(editDetailsModelId));
   if (idx !== -1) allModels[idx] = fresh; else allModels.push(fresh);
-  clearPendingFiles('edit-face-upload','edit-fit-upload','edit-hair-upload','edit-mua-upload','edit-outfit-upload','edit-curhair-upload');
+  clearPendingFiles('edit-face-upload','edit-fit-upload','edit-hair-upload','edit-mua-upload','edit-outfit-upload','edit-curhair-upload', ...editCustomPhotoIds);
   toast('Details saved ✓');
   closeEditDetails();
   showModelDashboard(fresh);
@@ -1873,6 +1903,77 @@ async function loadCustomTasks() {
   }))];
 }
 
+// ── Render / collect official custom questions (signup + edit details) ──
+function renderOfficialCustomQuestions(containerId, prefix, model) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const officialCustom = customTaskDefs.filter(ct => ct.is_official);
+  if (!officialCustom.length) { container.innerHTML = ''; return; }
+  const cf = model?.custom_fields || {};
+  container.innerHTML = '<div style="margin-top:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--black)"><div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase">ADDITIONAL QUESTIONS</div></div>' +
+    officialCustom.map(ct => {
+    const val = cf[ct.key] ?? '';
+    let input = '';
+    if (ct.type === 'text') {
+      input = `<input id="${prefix}-${ct.key}" placeholder="${ct.placeholder || ''}" value="${val}"/>`;
+    } else if (ct.type === 'select') {
+      const opts = ct.options || [];
+      input = `<div class="select-wrap"><select id="${prefix}-${ct.key}"><option value="">— select —</option>${opts.map(o => `<option value="${o}"${val === o ? ' selected' : ''}>${o}</option>`).join('')}</select></div>`;
+    } else if (ct.type === 'boolselect') {
+      const cur = val === true ? 'true' : val === false ? 'false' : '';
+      input = `<div class="select-wrap"><select id="${prefix}-${ct.key}"><option value="">— select —</option><option value="true"${cur === 'true' ? ' selected' : ''}>Yes</option><option value="false"${cur === 'false' ? ' selected' : ''}>No</option></select></div>`;
+    } else if (ct.type === 'photos') {
+      const existingUrls = toArr(val);
+      const existingHtml = existingUrls.length ? `<div class="file-previews">${existingUrls.map(u => `<div class="file-chip"><img src="${u}" alt=""/></div>`).join('')}</div>` : '';
+      input = `${existingHtml}
+        <div class="upload-zone" onclick="document.getElementById('${prefix}-${ct.key}').click()">
+          <input type="file" id="${prefix}-${ct.key}" multiple accept="image/*" style="display:none" onchange="pickFiles('${prefix}-${ct.key}',${ct.max_photos || 3})"/>
+          <div class="upload-zone-icon">${ct.icon || '📸'}</div>
+          <div class="upload-zone-text">Tap to upload</div>
+        </div>
+        <div class="file-previews" id="${prefix}-${ct.key}-previews"></div>`;
+    }
+    return `<div class="form-group"><label>${ct.icon || '📝'} ${ct.label}</label>${input}</div>`;
+  }).join('');
+}
+
+function collectOfficialCustomFields(prefix, existingCf) {
+  const cf = { ...(existingCf || {}) };
+  const officialCustom = customTaskDefs.filter(ct => ct.is_official);
+  for (const ct of officialCustom) {
+    if (ct.type === 'photos') continue; // handled by uploadOfficialCustomPhotos
+    const el = document.getElementById(`${prefix}-${ct.key}`);
+    if (!el) continue;
+    if (ct.type === 'boolselect') {
+      if (el.value === 'true') cf[ct.key] = true;
+      else if (el.value === 'false') cf[ct.key] = false;
+    } else {
+      const v = el.value.trim();
+      if (v) cf[ct.key] = v;
+    }
+  }
+  return cf;
+}
+
+async function uploadOfficialCustomPhotos(prefix, modelId, existingCf) {
+  const cf = { ...(existingCf || {}) };
+  const officialCustom = customTaskDefs.filter(ct => ct.is_official && ct.type === 'photos');
+  const inputIds = [];
+  for (const ct of officialCustom) {
+    const inputId = `${prefix}-${ct.key}`;
+    inputIds.push(inputId);
+    const files = chosenFiles(inputId);
+    if (files.length) {
+      const uploaded = await uploadFiles(files, modelId, 'custom_' + ct.key, ct.max_photos || 3);
+      if (uploaded.length) {
+        const existing = toArr(cf[ct.key]);
+        cf[ct.key] = [...existing, ...uploaded];
+      }
+    }
+  }
+  return { cf, inputIds };
+}
+
 function taskReg(key) { return TASK_REGISTRY.find(r => r.key === key); }
 function toTasks(v) {
   if (Array.isArray(v)) return v;
@@ -2005,8 +2106,8 @@ function renderCustomTasksList() {
   list.innerHTML = customTaskDefs.map(ct => `
     <div class="task-admin-row">
       <div>
-        <div class="task-admin-label">${ct.icon||'📝'} ${ct.label}</div>
-        <div class="task-admin-note">${ct.type}${ct.type==='select'?' — '+ct.options.join(', '):''}</div>
+        <div class="task-admin-label">${ct.icon||'📝'} ${ct.label}${ct.is_official ? ' <span style="font-size:9px;background:var(--brown);color:white;padding:2px 6px;border-radius:8px;margin-left:6px;font-weight:600;letter-spacing:.04em;vertical-align:middle">OFFICIAL</span>' : ''}</div>
+        <div class="task-admin-note">${ct.type}${ct.type==='select'?' — '+ct.options.join(', '):''}${ct.is_official ? ' · shows in signup + edit details' : ' · task only'}</div>
       </div>
       <button class="task-remove-x" title="Delete" onclick="deleteCustomTask('${ct.id}')">×</button>
     </div>`).join('');
@@ -2017,6 +2118,7 @@ async function addCustomTask() {
   const icon  = document.getElementById('ct-icon')?.value.trim() || '📝';
   const opts  = document.getElementById('ct-options')?.value.trim();
   const placeholder = document.getElementById('ct-placeholder')?.value.trim() || '';
+  const isOfficial = document.getElementById('ct-official')?.value === 'true';
   if (!label) { toast('Enter a question / label', true); return; }
   // auto-generate a unique key from the label
   const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) + '_' + Date.now().toString(36);
@@ -2025,6 +2127,7 @@ async function addCustomTask() {
     options: type === 'select' ? opts.split(',').map(s => s.trim()).filter(Boolean) : [],
     placeholder: type === 'text' ? placeholder : '',
     max_photos: type === 'photos' ? 3 : null,
+    is_official: isOfficial,
   };
   const { error } = await sb.from('custom_tasks').insert(payload);
   if (error) { toast(error.message, true); return; }
