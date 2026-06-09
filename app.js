@@ -264,8 +264,9 @@ async function signUp() {
 async function signUpExistingModel(username, pin) {
   const nameVal = document.getElementById('signup-name').value;
   if (!nameVal) { showError('signup-error','Select your name.'); return; }
+  // Allow re-signup: only block if username is taken by a DIFFERENT profile
   const { data:ex } = await sb.from('model_profiles').select('id').eq('username',username).maybeSingle();
-  if (ex) { showError('signup-error','Username already taken.'); return; }
+  if (ex && String(ex.id) !== String(nameVal)) { showError('signup-error','Username already taken.'); return; }
 
   showError('signup-error','Uploading photos, please wait…');
 
@@ -287,12 +288,14 @@ async function signUpExistingModel(username, pin) {
   const note        = document.getElementById('ex-note')?.value.trim() || '';
   const hairTexture = document.getElementById('ex-hair-texture')?.value || '';
   const hairLength  = document.getElementById('ex-hair-length-group-val')?.value || '';
+  const noOwnOutfit = document.getElementById('ex-no-own-outfit')?.checked || false;
 
-  const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
-  if (profileUrl)  updates.profile_photo = profileUrl;
-  if (ethnicity)   updates.ethnicity     = ethnicity;
-  if (hairTexture) updates.hair_texture  = hairTexture;
-  if (hairLength)  updates.hair_length   = hairLength;
+  const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true, no_own_outfit:noOwnOutfit };
+  if (profileUrl)  updates.profile_photo  = profileUrl;
+  if (ethnicity)   updates.ethnicity      = ethnicity;
+  if (hairTexture) updates.hair_texture   = hairTexture;
+  if (hairLength)  updates.hair_length    = hairLength;
+  if (noOwnOutfit) updates.assigned_stylist = 'Daniel';
 
   const { error } = await sb.from('model_profiles').update(updates).eq('id', nameVal);
   if (error) { showError('signup-error',error.message); return; }
@@ -354,6 +357,8 @@ async function signUpNewModel(username, pin) {
     makeup_self:   document.getElementById('new-makeup-self').value==='true' ? true : document.getElementById('new-makeup-self').value==='false' ? false : null,
     hair_texture:  document.getElementById('new-hair-texture')?.value || null,
     hair_length:   document.getElementById('new-hair-length-group-val')?.value || null,
+    no_own_outfit: document.getElementById('new-no-own-outfit')?.checked || false,
+    assigned_stylist: document.getElementById('new-no-own-outfit')?.checked ? 'Daniel' : null,
     agency:        document.getElementById('new-agency').value,
     model_note:    document.getElementById('new-note').value.trim(),
     username, pin, registered:true, approved:true,
@@ -400,6 +405,7 @@ function logout() {
   currentUser=null; allModels=[];
   document.querySelectorAll('.dashboard').forEach(d=>d.classList.add('hidden'));
   document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('panel-back-btn')?.classList.add('hidden');
   document.getElementById('signin-username').value='';
   document.getElementById('signin-pin').value='';
 }
@@ -430,6 +436,7 @@ async function showAdminDashboard() {
   hideAll();
   document.getElementById('admin-dashboard').classList.remove('hidden');
   document.getElementById('admin-name-display').textContent = currentUser.name;
+  document.getElementById('panel-back-btn')?.classList.remove('hidden');
   await loadAllModels();
   await loadInventory();
   await loadStaffUsers();
@@ -476,6 +483,7 @@ function renderAdminModels(search) {
   }
   if (activeTab==='completed') list = list.filter(m=>isCompleted(m));
   renderSignedUpPanel();
+  renderDanielPanel();
   const grid = document.getElementById('admin-model-grid');
   if (!grid) return;
   grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,'ADMIN')).join('') : '<div class="loading-center" style="grid-column:1/-1">No models here</div>';
@@ -527,6 +535,38 @@ function renderSignedUpPanel() {
       <div class="collapse-body">
         ${completedHTML}
         ${notYetHTML}
+      </div>
+    </div>`;
+}
+
+// Daniel's "My Models" — only renders when currentUser is Daniel, shows no_own_outfit models
+function renderDanielPanel() {
+  const panel = document.getElementById('daniel-panel');
+  if (!panel) return;
+  if (currentUser?.name !== 'Daniel') { panel.innerHTML = ''; return; }
+
+  const myModels = allModels.filter(m => m.no_own_outfit);
+  if (!myModels.length) { panel.innerHTML = ''; return; }
+
+  const makeCard = (m) => {
+    const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
+    return `<div class="signed-up-card" onclick="openModelPanel('${m.id}')">
+      <div class="signed-up-avatar">${avatar}</div>
+      <div class="signed-up-name">${(m.full_name||'—').split(' ')[0]}</div>
+    </div>`;
+  };
+
+  panel.innerHTML = `
+    <div class="collapse-section open" style="margin-bottom:24px">
+      <button class="collapse-btn" onclick="toggleCollapse(this)">
+        📌 My Models — No Own Fits
+        <span style="font-size:10px;font-family:var(--font-mono);opacity:.7;margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0">${myModels.length} model${myModels.length!==1?'s':''}</span>
+        <span class="collapse-arrow">▾</span>
+      </button>
+      <div class="collapse-body">
+        <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">These models ticked "no foundation outfits" — auto-assigned to you as stylist.</p>
+        <div class="signed-up-grid">${myModels.map(m => makeCard(m)).join('')}</div>
       </div>
     </div>`;
 }
@@ -906,7 +946,6 @@ async function openModelPanel(id) {
 
   document.getElementById('panel-body').innerHTML = body;
   document.getElementById('model-panel-overlay').classList.remove('hidden');
-  document.getElementById('panel-back-btn')?.classList.remove('hidden');
   document.body.style.overflow='hidden';
 }
 
@@ -926,7 +965,7 @@ function toggleInventoryPicker(btn) {
 
 function closePanel() {
   document.getElementById('model-panel-overlay').classList.add('hidden');
-  document.getElementById('panel-back-btn')?.classList.add('hidden');
+  // Back button stays visible — it's a persistent nav button for all logged-in users
   document.body.style.overflow='';
   openModelData=null;
 }
@@ -1024,6 +1063,7 @@ async function showStaffDashboard(user) {
   hideAll();
   document.getElementById('staff-dashboard').classList.remove('hidden');
   document.getElementById('staff-name-display').textContent = user.name;
+  document.getElementById('panel-back-btn')?.classList.remove('hidden');
   const labels = {STYLIST:'Stylist',HAIR_STYLIST:'Hair Stylist',MAKEUP_ARTIST:'Makeup Artist'};
   document.getElementById('staff-role-display').textContent = labels[user.role]||'Staff';
   // Inventory only for stylists (and admin). Hide for hair/makeup.
@@ -1216,6 +1256,7 @@ async function showModelDashboard(model) {
   const wrap = document.getElementById('model-profile-wrap');
   if (!wrap) return;
   document.getElementById('model-dashboard').classList.remove('hidden');
+  document.getElementById('panel-back-btn')?.classList.remove('hidden');
   await loadInventory();
   const staffNames = [model.assigned_stylist, model.assigned_hair, model.assigned_makeup].filter(Boolean);
   let staffByName = {};
