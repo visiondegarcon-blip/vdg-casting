@@ -60,6 +60,7 @@ let isNewModel       = false;
 let isNewStaff       = false;
 let staffUsers       = [];
 let currentModelData = null; // used by Edit Details panel
+let editProfileFile  = null; // stores selected profile photo file until save
 
 // ═══════════════════════════════════════════════
 // AUTH TABS
@@ -1360,6 +1361,7 @@ let editDetailsModelId = null;
 
 function openEditDetails(model) {
   editDetailsModelId = model.id;
+  editProfileFile = null; // reset any previously staged photo
 
   // Profile photo preview
   const prev = document.getElementById('edit-profile-preview');
@@ -1432,6 +1434,7 @@ function setVal(id, val) {
 
 function previewEditProfile(input) {
   if (!input.files[0]) return;
+  editProfileFile = input.files[0]; // save before innerHTML swap destroys the input
   const reader = new FileReader();
   reader.onload = e => {
     const prev = document.getElementById('edit-profile-preview');
@@ -1474,11 +1477,11 @@ async function saveEditDetails() {
     model_note:    document.getElementById('edit-model-note').value.trim(),
   };
 
-  // Upload new profile photo if selected
-  const profInput = document.getElementById('edit-profile-input');
-  if (profInput && profInput.files[0]) {
-    const u = await uploadFiles([profInput.files[0]], editDetailsModelId, 'profile');
+  // Upload new profile photo if selected (use saved file — innerHTML swap destroys the input)
+  if (editProfileFile) {
+    const u = await uploadFiles([editProfileFile], editDetailsModelId, 'profile');
     if (u.length) updates.profile_photo = u[0];
+    editProfileFile = null;
   }
 
   // Only fetch current photo arrays if at least one photo input has files
@@ -1500,6 +1503,7 @@ async function saveEditDetails() {
       .select('face_photos,photos,hair_photos,mua_photos,outfit_photos')
       .eq('id', editDetailsModelId).single();
 
+    const newOutfitUrls = []; // track newly uploaded outfit photos for inventory
     await Promise.all(photoFields.map(async ({ inputId, field, statusId, folder, max }) => {
       const input = document.getElementById(inputId);
       if (!input || !input.files.length) return;
@@ -1508,8 +1512,26 @@ async function saveEditDetails() {
         updates[field] = [...toArr(currentModel?.[field]), ...uploaded];
         const statusEl = document.getElementById(statusId);
         if (statusEl) statusEl.textContent = `✓ ${uploaded.length} uploaded`;
+        if (folder === 'outfit') newOutfitUrls.push(...uploaded);
       }
     }));
+
+    // Auto-add outfit photos to inventory assigned to this model
+    if (newOutfitUrls.length && currentModelData?.full_name) {
+      const modelName = currentModelData.full_name;
+      const existingCount = toArr(currentModel?.outfit_photos).length;
+      const rows = newOutfitUrls.map((url, i) => ({
+        name: `${modelName} – Own Outfit ${existingCount + i + 1}`,
+        category: 'Own Outfit',
+        size_qty: '',
+        assigned_model: modelName,
+        photo_url: url,
+      }));
+      await sb.from('inventory').insert(rows);
+      // Refresh local inventory cache
+      const { data: invData } = await sb.from('inventory').select('*').order('created_at', { ascending: false });
+      if (invData) inventoryData = invData;
+    }
   }
 
   const { error, data: updateData, count } = await sb.from('model_profiles')
