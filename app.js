@@ -61,6 +61,7 @@ let isNewStaff       = false;
 let staffUsers       = [];
 let currentModelData = null; // used by Edit Details panel
 let editProfileFile  = null; // stores selected profile photo file until save
+let customTaskDefs   = []; // loaded from custom_tasks table
 
 // ═══════════════════════════════════════════════
 // AUTH TABS
@@ -530,6 +531,7 @@ async function showAdminDashboard() {
   await loadAllModels();
   await loadInventory();
   await loadStaffUsers();
+  await loadCustomTasks();
   renderAdminModels();
 }
 
@@ -1745,6 +1747,7 @@ async function saveEditDetails() {
 // ═══════════════════════════════════════════════
 async function showModelDashboard(model) {
   currentModelData = model; // store globally so Edit Details button can access it safely
+  if (!customTaskDefs.length) await loadCustomTasks(); // ensure custom tasks loaded for model view
   hideAll();
   const wrap = document.getElementById('model-profile-wrap');
   if (!wrap) return;
@@ -1837,7 +1840,7 @@ async function uploadMorePhotos(input, field, modelId) {
 // models. Models see a "Tasks to Complete" button and fill only those items.
 // A model's `tasks` column = [{ key, note, done, assigned_at }].
 // ═══════════════════════════════════════════════
-const TASK_REGISTRY = [
+const BUILTIN_TASKS = [
   { key:'current_hair', icon:'💇‍♀️', label:'Upload current hairstyle photos',  type:'photos', field:'current_hair_photos', max:3 },
   { key:'face',         icon:'👤',   label:'Upload face close-up photo',       type:'photos', field:'face_photos',         max:1 },
   { key:'hair_inspo',   icon:'💇',   label:'Upload hair inspo photos',         type:'photos', field:'hair_photos',         max:3 },
@@ -1851,6 +1854,25 @@ const TASK_REGISTRY = [
   { key:'top_size',     icon:'👕',   label:'Tell us your top size',            type:'text',   field:'top_size',  placeholder:'e.g. M' },
   { key:'jean_size',    icon:'👖',   label:'Tell us your jean size',           type:'text',   field:'jean_size', placeholder:'e.g. 32' },
 ];
+let TASK_REGISTRY = [...BUILTIN_TASKS];
+
+async function loadCustomTasks() {
+  const { data } = await sb.from('custom_tasks').select('*').order('created_at');
+  customTaskDefs = data || [];
+  // Rebuild registry: built-ins + custom (custom tasks store answers in custom_fields jsonb)
+  TASK_REGISTRY = [...BUILTIN_TASKS, ...customTaskDefs.map(ct => ({
+    key: 'custom_' + ct.key,
+    icon: ct.icon || '📝',
+    label: ct.label,
+    type: ct.type,
+    field: null, // signals "store in custom_fields"
+    customKey: ct.key, // key inside custom_fields jsonb
+    options: ct.type === 'select' ? (ct.options || []) : undefined,
+    placeholder: ct.placeholder || '',
+    max: ct.type === 'photos' ? (ct.max_photos || 3) : undefined,
+  }))];
+}
+
 function taskReg(key) { return TASK_REGISTRY.find(r => r.key === key); }
 function toTasks(v) {
   if (Array.isArray(v)) return v;
@@ -1931,12 +1953,25 @@ async function removeTaskFromModel(modelId, key) {
 // Admin panel block: current tasks + assign button
 function adminTasksBlock(m) {
   const tasks = toTasks(m.tasks);
+  const cf = m.custom_fields || {};
   const rows = tasks.length ? tasks.map(t => {
     const reg = taskReg(t.key);
     const label = reg ? `${reg.icon} ${reg.label}` : t.key;
     const status = t.done ? `<span class="task-status done">✓ Done</span>` : `<span class="task-status pending">◷ Pending</span>`;
+    // Show the answer for done tasks
+    let answer = '';
+    if (t.done && reg) {
+      const isCustom = !reg.field;
+      const val = isCustom ? cf[reg.customKey] : m[reg.field];
+      if (reg.type === 'photos') {
+        const urls = toArr(val);
+        if (urls.length) answer = `<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">${urls.map(u=>`<img src="${u}" style="width:36px;height:36px;border-radius:4px;object-fit:cover"/>`).join('')}</div>`;
+      } else if (val !== undefined && val !== null && val !== '') {
+        answer = `<div class="task-admin-note" style="font-style:normal;color:var(--text)">→ ${val}</div>`;
+      }
+    }
     return `<div class="task-admin-row">
-      <div><div class="task-admin-label">${label}</div>${t.note?`<div class="task-admin-note">"${t.note}"</div>`:''}</div>
+      <div><div class="task-admin-label">${label}</div>${t.note?`<div class="task-admin-note">"${t.note}"</div>`:''}${answer}</div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${status}<button class="task-remove-x" title="Remove" onclick="removeTaskFromModel('${m.id}','${t.key}')">×</button></div>
     </div>`;
   }).join('') : '<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">No tasks assigned.</div>';
@@ -1949,14 +1984,78 @@ function adminTasksBlock(m) {
     </div>`;
 }
 
+// ── ADMIN: manage custom task definitions ──
+function openManageTasksModal() {
+  const overlay = document.getElementById('manage-tasks-overlay');
+  if (!overlay) return;
+  renderCustomTasksList();
+  overlay.classList.remove('hidden');
+}
+function closeManageTasksModal(e) {
+  if (e && e.target.id !== 'manage-tasks-overlay') return;
+  document.getElementById('manage-tasks-overlay').classList.add('hidden');
+}
+function renderCustomTasksList() {
+  const list = document.getElementById('custom-tasks-list');
+  if (!list) return;
+  if (!customTaskDefs.length) {
+    list.innerHTML = '<div style="font-size:12px;color:var(--dim);font-family:var(--font-mono);padding:12px 0">No custom questions yet. Add one below.</div>';
+    return;
+  }
+  list.innerHTML = customTaskDefs.map(ct => `
+    <div class="task-admin-row">
+      <div>
+        <div class="task-admin-label">${ct.icon||'📝'} ${ct.label}</div>
+        <div class="task-admin-note">${ct.type}${ct.type==='select'?' — '+ct.options.join(', '):''}</div>
+      </div>
+      <button class="task-remove-x" title="Delete" onclick="deleteCustomTask('${ct.id}')">×</button>
+    </div>`).join('');
+}
+async function addCustomTask() {
+  const label = document.getElementById('ct-label')?.value.trim();
+  const type  = document.getElementById('ct-type')?.value;
+  const icon  = document.getElementById('ct-icon')?.value.trim() || '📝';
+  const opts  = document.getElementById('ct-options')?.value.trim();
+  const placeholder = document.getElementById('ct-placeholder')?.value.trim() || '';
+  if (!label) { toast('Enter a question / label', true); return; }
+  // auto-generate a unique key from the label
+  const key = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40) + '_' + Date.now().toString(36);
+  const payload = {
+    key, icon, label, type,
+    options: type === 'select' ? opts.split(',').map(s => s.trim()).filter(Boolean) : [],
+    placeholder: type === 'text' ? placeholder : '',
+    max_photos: type === 'photos' ? 3 : null,
+  };
+  const { error } = await sb.from('custom_tasks').insert(payload);
+  if (error) { toast(error.message, true); return; }
+  await loadCustomTasks();
+  renderCustomTasksList();
+  // clear form
+  document.getElementById('ct-label').value = '';
+  document.getElementById('ct-options').value = '';
+  document.getElementById('ct-placeholder').value = '';
+  toast('Custom question added ✓');
+}
+async function deleteCustomTask(id) {
+  if (!confirm('Delete this custom question? Models who already completed it will keep their answers, but the task definition will be removed.')) return;
+  const { error } = await sb.from('custom_tasks').delete().eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  await loadCustomTasks();
+  renderCustomTasksList();
+  toast('Deleted');
+}
+
 // ── MODEL: complete assigned tasks ──
 function openModelTaskPanel() {
   const m = currentModelData;
   if (!m) return;
   const tasks = pendingTasks(m);
   if (!tasks.length) { toast('No tasks to complete 🎉'); return; }
+  const cf = m.custom_fields || {};
   const body = tasks.map(t => {
     const reg = taskReg(t.key);
+    const isCustom = !reg.field;
+    const curVal = isCustom ? (cf[reg.customKey] ?? '') : (m[reg.field] ?? '');
     let input = '';
     if (reg.type === 'photos') {
       input = `
@@ -1967,12 +2066,12 @@ function openModelTaskPanel() {
         </div>
         <div class="file-previews" id="task-${reg.key}-previews"></div>`;
     } else if (reg.type === 'select') {
-      input = `<div class="select-wrap"><select id="taskinput-${reg.key}"><option value="">— select —</option>${reg.options.map(o=>`<option value="${o}"${m[reg.field]===o?' selected':''}>${o}</option>`).join('')}</select></div>`;
+      input = `<div class="select-wrap"><select id="taskinput-${reg.key}"><option value="">— select —</option>${reg.options.map(o=>`<option value="${o}"${curVal===o?' selected':''}>${o}</option>`).join('')}</select></div>`;
     } else if (reg.type === 'boolselect') {
-      const cur = m[reg.field]===true?'true':m[reg.field]===false?'false':'';
+      const cur = curVal===true?'true':curVal===false?'false':'';
       input = `<div class="select-wrap"><select id="taskinput-${reg.key}"><option value="">— select —</option><option value="true"${cur==='true'?' selected':''}>Yes</option><option value="false"${cur==='false'?' selected':''}>No</option></select></div>`;
     } else { // text
-      input = `<input id="taskinput-${reg.key}" placeholder="${reg.placeholder||''}" value="${m[reg.field]||''}"/>`;
+      input = `<input id="taskinput-${reg.key}" placeholder="${reg.placeholder||''}" value="${curVal||''}"/>`;
     }
     return `<div class="task-todo">
       <div class="task-todo-title">${reg.icon} ${reg.label}</div>
@@ -1999,32 +2098,58 @@ async function submitModelTasks() {
   const updates = {};
   const newOutfitUrls = [];
 
+  const customFields = { ...(model.custom_fields || {}) };
+  let customFieldsChanged = false;
+
   for (const t of tasks) {
     if (t.done) continue;
     const reg = taskReg(t.key);
     if (!reg) continue;
+    const isCustom = !reg.field; // custom tasks have field:null, store in custom_fields
+
     if (reg.type === 'photos') {
       const files = chosenFiles('task-' + reg.key);
       if (files.length) {
-        const uploaded = await uploadFiles(files, modelId, reg.field, reg.max);
-        if (uploaded.length) {
-          const existing = toArr(updates[reg.field] ?? model[reg.field]);
-          updates[reg.field] = [...existing, ...uploaded];
-          if (reg.field === 'outfit_photos') newOutfitUrls.push(...uploaded);
-          t.done = true;
+        if (isCustom) {
+          const uploaded = await uploadFiles(files, modelId, 'custom_' + reg.customKey, reg.max);
+          if (uploaded.length) {
+            const existing = toArr(customFields[reg.customKey]);
+            customFields[reg.customKey] = [...existing, ...uploaded];
+            customFieldsChanged = true;
+            t.done = true;
+          }
+        } else {
+          const uploaded = await uploadFiles(files, modelId, reg.field, reg.max);
+          if (uploaded.length) {
+            const existing = toArr(updates[reg.field] ?? model[reg.field]);
+            updates[reg.field] = [...existing, ...uploaded];
+            if (reg.field === 'outfit_photos') newOutfitUrls.push(...uploaded);
+            t.done = true;
+          }
         }
-      } else if (toArr(model[reg.field]).length) {
+      } else if (!isCustom && toArr(model[reg.field]).length) {
         t.done = true; // already satisfied
+      } else if (isCustom && toArr(customFields[reg.customKey]).length) {
+        t.done = true;
       }
     } else if (reg.type === 'boolselect') {
       const v = document.getElementById('taskinput-' + reg.key)?.value;
-      if (v === 'true' || v === 'false') { updates[reg.field] = v === 'true'; t.done = true; }
+      if (v === 'true' || v === 'false') {
+        if (isCustom) { customFields[reg.customKey] = v === 'true'; customFieldsChanged = true; }
+        else { updates[reg.field] = v === 'true'; }
+        t.done = true;
+      }
     } else { // select or text
       const v = (document.getElementById('taskinput-' + reg.key)?.value || '').trim();
-      if (v) { updates[reg.field] = v; t.done = true; }
+      if (v) {
+        if (isCustom) { customFields[reg.customKey] = v; customFieldsChanged = true; }
+        else { updates[reg.field] = v; }
+        t.done = true;
+      }
     }
   }
   updates.tasks = tasks;
+  if (customFieldsChanged) updates.custom_fields = customFields;
 
   const { error, data } = await sb.from('model_profiles').update(updates).eq('id', modelId).select();
   if (saveBtn) { saveBtn.textContent = 'Done'; saveBtn.disabled = false; }

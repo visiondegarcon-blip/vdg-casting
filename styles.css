@@ -43,6 +43,14 @@ input, select, textarea {
   appearance: none;
   -webkit-appearance: none;
 }
+input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  width: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
 input:focus, select:focus, textarea:focus {
   border-color: var(--brown);
   box-shadow: 0 0 0 3px rgba(140,106,79,.1);

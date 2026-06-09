@@ -579,6 +579,7 @@
         <div class="topbar-title" id="admin-page-title">All Models</div>
         <div class="topbar-actions">
           <button class="btn btn-sm btn-brown" style="width:auto" onclick="openTaskModal('bulk')">📋 Assign Task to All</button>
+          <button class="btn btn-sm btn-ghost" style="width:auto" onclick="openManageTasksModal()">⚙ Manage Questions</button>
           <button class="btn btn-sm btn-ghost" style="width:auto" onclick="exportModelsCSV()">⬇ Export CSV</button>
           <input type="text" class="search-input" placeholder="Search…" oninput="filterModels(this.value)" id="model-search"/>
         </div>
@@ -997,6 +998,54 @@
     </div>
   </div>
 
+  <!-- MANAGE CUSTOM QUESTIONS MODAL (admin) -->
+  <div class="modal-overlay hidden" id="manage-tasks-overlay" onclick="closeManageTasksModal(event)">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <span style="font-family:var(--font-display);font-size:22px;font-weight:400;letter-spacing:.04em">Manage Questions</span>
+        <button class="panel-close" onclick="document.getElementById('manage-tasks-overlay').classList.add('hidden')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin:0 0 16px">
+          Custom questions you create here show up in the "Assign Task" list. Models answer them inside Tasks to Complete.
+        </p>
+        <div id="custom-tasks-list" style="margin-bottom:20px"></div>
+
+        <div style="border-top:1.5px solid var(--border);padding-top:16px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);font-family:var(--font-mono);margin-bottom:12px">Add New Question</div>
+          <div class="form-group">
+            <label>Question / Label</label>
+            <input id="ct-label" placeholder="e.g. What shoes are you bringing?"/>
+          </div>
+          <div class="form-group">
+            <label>Icon (emoji)</label>
+            <input id="ct-icon" placeholder="📝" style="width:60px"/>
+          </div>
+          <div class="form-group">
+            <label>Answer Type</label>
+            <div class="select-wrap">
+              <select id="ct-type" onchange="document.getElementById('ct-options-wrap').classList.toggle('hidden',this.value!=='select');document.getElementById('ct-placeholder-wrap').classList.toggle('hidden',this.value!=='text')">
+                <option value="text">Text (free type)</option>
+                <option value="photos">Photo Upload</option>
+                <option value="select">Dropdown (pick from list)</option>
+                <option value="boolselect">Yes / No</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group hidden" id="ct-options-wrap">
+            <label>Options (comma-separated)</label>
+            <input id="ct-options" placeholder="e.g. Sneakers, Heels, Boots, Sandals"/>
+          </div>
+          <div class="form-group hidden" id="ct-placeholder-wrap">
+            <label>Placeholder (optional)</label>
+            <input id="ct-placeholder" placeholder="e.g. describe your shoes"/>
+          </div>
+          <button class="btn btn-brown" onclick="addCustomTask()">+ Add Question</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- COMPLETE TASKS PANEL (model) -->
   <div class="edit-details-overlay hidden" id="task-panel-overlay">
     <div class="edit-details-panel">
@@ -1020,6 +1069,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=9"></script>
 </body>
 </html>
