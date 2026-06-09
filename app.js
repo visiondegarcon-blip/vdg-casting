@@ -549,10 +549,10 @@ function renderSignedUpPanel() {
   const panel = document.getElementById('signed-up-panel');
   if (!panel) return;
 
-  // "Completed" = went through signup form AND uploaded a face photo (confirms post-fix signup)
-  const completed = allModels.filter(m => m.registered && toArr(m.face_photos).length > 0 && !m.signup_acknowledged);
-  // "Not yet" = never registered OR registered but no face photo (old/incomplete signup)
-  const notYet    = allModels.filter(m => !m.registered || toArr(m.face_photos).length === 0);
+  // "Completed" = went through signup form AND uploaded face photo, OR admin manually marked complete
+  const completed = allModels.filter(m => ((m.registered && toArr(m.face_photos).length > 0) || m.signup_manually_complete) && !m.signup_acknowledged);
+  // "Not yet" = never registered, missing face photo, AND not manually marked
+  const notYet    = allModels.filter(m => (!m.registered || toArr(m.face_photos).length === 0) && !m.signup_manually_complete);
 
   if (!completed.length && !notYet.length) { panel.innerHTML = ''; return; }
 
@@ -560,7 +560,8 @@ function renderSignedUpPanel() {
     const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
     const xBtn     = dismissable ? `<button class="signed-up-dismiss" onclick="event.stopPropagation();dismissSignup('${m.id}')" title="Dismiss">×</button>` : '';
-    return `<div class="signed-up-card" onclick="openModelPanel('${m.id}')">
+    const clickFn  = dismissable ? `openModelPanel('${m.id}')` : `openTrackerDetail('${m.id}')`;
+    return `<div class="signed-up-card" onclick="${clickFn}">
       ${xBtn}
       <div class="signed-up-avatar">${avatar}</div>
       <div class="signed-up-name">${(m.full_name||'—').split(' ')[0]}</div>
@@ -577,7 +578,7 @@ function renderSignedUpPanel() {
   const notYetHTML = notYet.length ? `
     <div>
       <div class="panel-section-title" style="margin-bottom:10px">⏳ Not Signed Up Yet <span style="font-weight:400;color:var(--dim);font-size:10px">${notYet.length}</span></div>
-      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">Haven't completed sign up or missing face photo — reach out to these models to finish.</p>
+      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">Haven't completed sign up — tap a model to view details and mark as complete if they've finished via Edit Details.</p>
       <div class="signed-up-grid">${notYet.map(m => makeCard(m, false)).join('')}</div>
     </div>` : '';
 
@@ -593,6 +594,84 @@ function renderSignedUpPanel() {
         ${notYetHTML}
       </div>
     </div>`;
+}
+
+function openTrackerDetail(id) {
+  const m = allModels.find(x => String(x.id) === String(id));
+  if (!m) return;
+  const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>` : initials;
+
+  // Format last updated timestamp
+  let lastUpdated = '—';
+  if (m.updated_at) {
+    const d = new Date(m.updated_at);
+    lastUpdated = d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+      + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', hour12:true });
+  }
+
+  const signedUpStatus = m.registered ? '✅ Registered' : '⏳ Not registered';
+  const hasFace = toArr(m.face_photos).length > 0;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'tracker-detail-overlay';
+  overlay.id = 'tracker-detail-overlay';
+  overlay.innerHTML = `
+    <div class="tracker-detail-modal">
+      <button class="tracker-detail-close" onclick="closeTrackerDetail()">×</button>
+      <div class="tracker-detail-header">
+        <div class="tracker-detail-avatar">${avatar}</div>
+        <div>
+          <div style="font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--text)">${m.full_name||'—'}</div>
+          <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Last updated: ${lastUpdated}</div>
+        </div>
+      </div>
+      <div class="tracker-detail-body">
+        <div class="tracker-detail-row">
+          <span class="tracker-detail-label">Sign Up Status</span>
+          <span class="tracker-detail-value">${signedUpStatus}</span>
+        </div>
+        <div class="tracker-detail-row">
+          <span class="tracker-detail-label">Face Photo</span>
+          <span class="tracker-detail-value">${hasFace ? '✅ Uploaded' : '⏳ Missing'}</span>
+        </div>
+        <div class="tracker-detail-row">
+          <span class="tracker-detail-label">Instagram</span>
+          <span class="tracker-detail-value">${m.instagram ? '@'+m.instagram : '—'}</span>
+        </div>
+        <div class="tracker-detail-row">
+          <span class="tracker-detail-label">Phone</span>
+          <span class="tracker-detail-value">${m.phone||'—'}</span>
+        </div>
+      </div>
+      <div class="tracker-detail-footer">
+        <button class="tracker-complete-btn" onclick="markSignupComplete('${m.id}')">
+          ✅ Mark as Sign Up Complete
+        </button>
+        <button class="tracker-view-btn" onclick="closeTrackerDetail();openModelPanel('${m.id}')">
+          View Full Profile →
+        </button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeTrackerDetail(); });
+  document.body.appendChild(overlay);
+}
+
+function closeTrackerDetail() {
+  const el = document.getElementById('tracker-detail-overlay');
+  if (el) el.remove();
+}
+
+async function markSignupComplete(id) {
+  const btn = document.querySelector('.tracker-complete-btn');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: true }).eq('id', id);
+  if (error) { toast(error.message, true); if (btn) { btn.textContent = '✅ Mark as Sign Up Complete'; btn.disabled = false; } return; }
+  const m = allModels.find(x => String(x.id) === String(id));
+  if (m) m.signup_manually_complete = true;
+  closeTrackerDetail();
+  renderSignedUpPanel();
+  toast('Marked as sign up complete ✓');
 }
 
 // Daniel's "My Models" — only renders when currentUser is Daniel, shows no_own_outfit models
