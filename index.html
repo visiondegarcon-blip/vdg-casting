@@ -591,16 +591,16 @@
       </div>
     </div>
     <main class="main-content">
-      <div class="topbar">
+      <div class="topbar" style="display:none" id="staff-topbar">
         <div class="topbar-title" id="staff-page-title">All Models</div>
         <div class="topbar-actions">
         </div>
       </div>
       <div class="panel-content">
-        <div class="tab-nav">
-          <button class="tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
-          <button class="tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
-          <button class="tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>
+        <div class="tab-nav staff-tab-nav">
+          <button class="tab-btn staff-tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
+          <button class="tab-btn staff-tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
+          <button class="tab-btn staff-tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>
         </div>
         <div id="staff-models-content">
           <!-- Search sits directly above the model list so it's visible without scrolling up -->

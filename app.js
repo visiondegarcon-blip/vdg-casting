@@ -850,7 +850,7 @@ async function openModelPanel(id) {
           <div class="panel-section-title" style="margin-top:4px">Assigned to ${(m.full_name||'this model').split(' ')[0]}</div>
           <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 12px">Everything currently in their stage fit — including pieces they uploaded themselves and items staff have assigned.</p>
           ${assignedGrid}
-          <button class="btn btn-sm btn-ghost" style="margin-top:14px" onclick="toggleInventoryPicker(this)">+ Add from Inventory</button>
+          <button class="btn btn-sm btn-blue" style="margin-top:14px" onclick="toggleInventoryPicker(this)">+ Add from Inventory</button>
           <div class="inv-picker-wrap" style="display:none;margin-top:12px">
             <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 10px">Tap an item to assign it — other staff will see it's taken.</p>
             <div class="stage-fit-pick-list">${pickRows}</div>
