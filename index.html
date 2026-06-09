@@ -166,6 +166,43 @@
                   </div>
                 </div>
                 <div class="form-group">
+                  <label>Hair Texture</label>
+                  <div class="select-wrap">
+                    <select id="ex-hair-texture">
+                      <option value="">— select texture —</option>
+                      <optgroup label="Type 1 — Straight">
+                        <option value="1A">1A — Pin straight, very fine</option>
+                        <option value="1B">1B — Straight with slight body</option>
+                        <option value="1C">1C — Straight, coarser / slight wave</option>
+                      </optgroup>
+                      <optgroup label="Type 2 — Wavy">
+                        <option value="2A">2A — Loose S-wave, fine</option>
+                        <option value="2B">2B — Defined S-wave, medium</option>
+                        <option value="2C">2C — Strong S-wave / frizz-prone</option>
+                      </optgroup>
+                      <optgroup label="Type 3 — Curly">
+                        <option value="3A">3A — Loose, shiny curls</option>
+                        <option value="3B">3B — Springy, bouncy curls</option>
+                        <option value="3C">3C — Tight corkscrew curls</option>
+                      </optgroup>
+                      <optgroup label="Type 4 — Coily / Kinky">
+                        <option value="4A">4A — Soft, defined coils</option>
+                        <option value="4B">4B — Z-pattern, less defined</option>
+                        <option value="4C">4C — Tight coils, most shrinkage</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Hair Length</label>
+                  <div class="btn-group-select" id="ex-hair-length-group">
+                    <button type="button" class="btn-group-option" onclick="selectHairLength('ex-hair-length-group','Short',this)">Short</button>
+                    <button type="button" class="btn-group-option" onclick="selectHairLength('ex-hair-length-group','Medium',this)">Medium</button>
+                    <button type="button" class="btn-group-option" onclick="selectHairLength('ex-hair-length-group','Long',this)">Long</button>
+                    <input type="hidden" id="ex-hair-length-group-val" value=""/>
+                  </div>
+                </div>
+                <div class="form-group">
                   <label>Notes (optional)</label>
                   <textarea id="ex-note" placeholder="Anything you want the hair, makeup or styling team to know…"></textarea>
                 </div>
@@ -328,11 +365,49 @@
                 </div>
               </div>
               <div class="form-group">
+                <label>Hair Texture</label>
+                <div class="select-wrap">
+                  <select id="new-hair-texture">
+                    <option value="">— select texture —</option>
+                    <optgroup label="Type 1 — Straight">
+                      <option value="1A">1A — Pin straight, very fine</option>
+                      <option value="1B">1B — Straight with slight body</option>
+                      <option value="1C">1C — Straight, coarser / slight wave</option>
+                    </optgroup>
+                    <optgroup label="Type 2 — Wavy">
+                      <option value="2A">2A — Loose S-wave, fine</option>
+                      <option value="2B">2B — Defined S-wave, medium</option>
+                      <option value="2C">2C — Strong S-wave / frizz-prone</option>
+                    </optgroup>
+                    <optgroup label="Type 3 — Curly">
+                      <option value="3A">3A — Loose, shiny curls</option>
+                      <option value="3B">3B — Springy, bouncy curls</option>
+                      <option value="3C">3C — Tight corkscrew curls</option>
+                    </optgroup>
+                    <optgroup label="Type 4 — Coily / Kinky">
+                      <option value="4A">4A — Soft, defined coils</option>
+                      <option value="4B">4B — Z-pattern, less defined</option>
+                      <option value="4C">4C — Tight coils, most shrinkage</option>
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Hair Length</label>
+                <div class="btn-group-select" id="new-hair-length-group">
+                  <button type="button" class="btn-group-option" onclick="selectHairLength('new-hair-length-group','Short',this)">Short</button>
+                  <button type="button" class="btn-group-option" onclick="selectHairLength('new-hair-length-group','Medium',this)">Medium</button>
+                  <button type="button" class="btn-group-option" onclick="selectHairLength('new-hair-length-group','Long',this)">Long</button>
+                  <input type="hidden" id="new-hair-length-group-val" value=""/>
+                </div>
+              </div>
+              <div class="form-group">
                 <label>Can you do your own makeup?</label>
                 <div class="select-wrap">
                   <select id="new-makeup-self">
                     <option value="true">Yes</option>
                     <option value="false">No — I need a MUA</option>
+                    <option value="skip">Skip for now</option>
                   </select>
                 </div>
               </div>

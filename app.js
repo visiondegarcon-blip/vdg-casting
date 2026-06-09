@@ -110,6 +110,13 @@ function previewInvPhoto(input) {
   r.readAsDataURL(file);
 }
 
+// Toggle hair length button selection
+function selectHairLength(groupId, val, btn) {
+  document.querySelectorAll(`#${groupId} .btn-group-option`).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(groupId + '-val').value = val;
+}
+
 // ═══════════════════════════════════════════════
 // LOAD NAMES ON ROLE SELECT
 // ═══════════════════════════════════════════════
@@ -276,12 +283,16 @@ async function signUpExistingModel(username, pin) {
   const muaUrls    = await uploadFiles(document.getElementById('ex-mua').files,    nameVal, 'mua', 3);
   const outfitUrls = await uploadFiles(document.getElementById('ex-outfit').files, nameVal, 'outfit', 3);
 
-  const ethnicity = document.getElementById('existing-ethnicity')?.value || '';
-  const note      = document.getElementById('ex-note')?.value.trim() || '';
+  const ethnicity   = document.getElementById('existing-ethnicity')?.value || '';
+  const note        = document.getElementById('ex-note')?.value.trim() || '';
+  const hairTexture = document.getElementById('ex-hair-texture')?.value || '';
+  const hairLength  = document.getElementById('ex-hair-length-group-val')?.value || '';
 
   const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, model_note:note, needs_hair:true, needs_makeup:true };
-  if (profileUrl) updates.profile_photo = profileUrl;
-  if (ethnicity)  updates.ethnicity = ethnicity;
+  if (profileUrl)  updates.profile_photo = profileUrl;
+  if (ethnicity)   updates.ethnicity     = ethnicity;
+  if (hairTexture) updates.hair_texture  = hairTexture;
+  if (hairLength)  updates.hair_length   = hairLength;
 
   const { error } = await sb.from('model_profiles').update(updates).eq('id', nameVal);
   if (error) { showError('signup-error',error.message); return; }
@@ -340,7 +351,9 @@ async function signUpNewModel(username, pin) {
     talent_desc:   document.getElementById('new-talent-desc').value.trim(),
     free_5july:    document.getElementById('new-free').value==='true',
     hair_ok:       document.getElementById('new-hair-ok').value==='true',
-    makeup_self:   document.getElementById('new-makeup-self').value==='true',
+    makeup_self:   document.getElementById('new-makeup-self').value==='true' ? true : document.getElementById('new-makeup-self').value==='false' ? false : null,
+    hair_texture:  document.getElementById('new-hair-texture')?.value || null,
+    hair_length:   document.getElementById('new-hair-length-group-val')?.value || null,
     agency:        document.getElementById('new-agency').value,
     model_note:    document.getElementById('new-note').value.trim(),
     username, pin, registered:true, approved:true,
@@ -743,9 +756,11 @@ async function openModelPanel(id) {
           <div class="panel-section-title" style="margin-top:4px">Assigned to ${(m.full_name||'this model').split(' ')[0]}</div>
           <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 12px">Everything currently in their stage fit — including pieces they uploaded themselves and items staff have assigned.</p>
           ${assignedGrid}
-          <div class="panel-section-title" style="margin-top:18px">Add From Inventory</div>
-          <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-8px 0 10px">Tap an item to add it — it'll mark the item as taken and other staff will see it's assigned.</p>
-          <div class="stage-fit-pick-list">${pickRows}</div>
+          <button class="btn btn-sm btn-ghost" style="margin-top:14px" onclick="toggleInventoryPicker(this)">+ Add from Inventory</button>
+          <div class="inv-picker-wrap" style="display:none;margin-top:12px">
+            <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 10px">Tap an item to assign it — other staff will see it's taken.</p>
+            <div class="stage-fit-pick-list">${pickRows}</div>
+          </div>
         </div>
       </div>`;
   }
@@ -760,22 +775,46 @@ async function openModelPanel(id) {
       <div class="collapse-body">${photoGrid(facePh)}</div>
     </div>`;
 
+  // Hair and Makeup info card (texture, length, makeup status)
+  const makeupStatusTxt = m.makeup_self === true  ? '✓ Can do own makeup' :
+                          m.makeup_self === false ? '✗ Needs a MUA' : '— Not specified';
+  const makeupStatusCol = m.makeup_self === true  ? '#1a6640' :
+                          m.makeup_self === false ? 'var(--red)' : 'var(--dim)';
+  const hairInfoCard = `
+    <div style="background:var(--cream);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:10px">
+        <div>
+          <div style="font-size:10px;color:var(--dim);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Hair Texture</div>
+          <div style="font-size:16px;font-weight:600;letter-spacing:.02em">${m.hair_texture||'—'}</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--dim);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Hair Length</div>
+          <div style="font-size:16px;font-weight:600;letter-spacing:.02em">${m.hair_length||'—'}</div>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:10px">
+        <div style="font-size:10px;color:var(--dim);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px">Makeup</div>
+        <div style="font-size:13px;font-weight:500;color:${makeupStatusCol}">${makeupStatusTxt}</div>
+      </div>
+    </div>`;
+
   const hairMuaSection = `
     <div class="collapse-section">
-      <button class="collapse-btn" onclick="toggleCollapse(this)">💇 Hair & Makeup Inspo <span class="collapse-arrow">▾</span></button>
+      <button class="collapse-btn" onclick="toggleCollapse(this)">💇 Hair and Make Up Info <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
+        ${hairInfoCard}
         <div class="panel-section-title" style="margin-top:4px">Hair Inspo</div>${photoGrid(hairPh)}
         <div class="panel-section-title" style="margin-top:16px">Makeup Inspo</div>${photoGrid(muaPh)}
       </div>
     </div>`;
 
-  // Outfit = model's own fit photos + outfit photos (assigned inventory now lives in Stage Fit)
+  // Base Fits = model's own fit photos + outfit photos (assigned inventory now lives in Stage Fit)
   const ownFits = [...photos, ...outfitPh];
   const outfitSection = `
     <div class="collapse-section">
-      <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Outfit <span class="collapse-arrow">▾</span></button>
+      <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Base Fits <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
-        <div class="panel-section-title" style="margin-top:4px">Model's Own Fits</div>${photoGrid(ownFits)}
+        <div class="panel-section-title" style="margin-top:4px">Model's Own Base Fits</div>${photoGrid(ownFits)}
       </div>
     </div>`;
 
@@ -790,13 +829,15 @@ async function openModelPanel(id) {
         <div class="detail-item"><label>Gender</label><div class="val">${m.gender||'—'}</div></div>
         <div class="detail-item"><label>Ethnicity</label><div class="val">${flag} ${m.ethnicity||'—'}</div></div>
         <div class="detail-item"><label>Height</label><div class="val">${m.height||'—'}</div></div>
+        <div class="detail-item"><label>Hair Texture</label><div class="val">${m.hair_texture||'—'}</div></div>
+        <div class="detail-item"><label>Hair Length</label><div class="val">${m.hair_length||'—'}</div></div>
         <div class="detail-item"><label>Top</label><div class="val">${m.top_size||'—'}</div></div>
         <div class="detail-item"><label>Jeans</label><div class="val">${m.jean_size||'—'}</div></div>
         <div class="detail-item"><label>Suburb</label><div class="val">${m.suburb||'—'}</div></div>
         ${isAdmin?`<div class="detail-item"><label>Phone</label><div class="val">${m.phone||'—'}</div></div>`:''}
         <div class="detail-item"><label>Free Jul 5</label><div class="val">${m.free_5july?'Yes':'⚠ Busy AM'}</div></div>
         <div class="detail-item"><label>Hair Change</label><div class="val">${m.hair_ok?'Yes':'No'}</div></div>
-        <div class="detail-item"><label>Own Makeup</label><div class="val">${m.makeup_self?'Yes':'Needs MUA'}</div></div>
+        <div class="detail-item"><label>Own Makeup</label><div class="val">${m.makeup_self===true?'Yes':m.makeup_self===false?'Needs MUA':'—'}</div></div>
         <div class="detail-item"><label>Style</label><div class="val">${m.style||'—'}</div></div>
       </div>
     </div>
@@ -873,6 +914,14 @@ async function openModelPanel(id) {
 function toggleCollapse(btn) {
   const sec = btn.parentElement;
   sec.classList.toggle('open');
+}
+
+// Toggle the "Add from Inventory" picker inside Stage Fit
+function toggleInventoryPicker(btn) {
+  const wrap = btn.nextElementSibling;
+  const isHidden = wrap.style.display === 'none';
+  wrap.style.display = isHidden ? 'block' : 'none';
+  btn.textContent = isHidden ? '− Close Inventory' : '+ Add from Inventory';
 }
 
 function closePanel() {
