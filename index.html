@@ -581,11 +581,13 @@
         </div>
       </div>
       <div class="panel-content">
-        <!-- Search sits at the very top so it's the first thing visible -->
-        <div id="staff-search-wrap" style="margin-bottom:14px">
-          <input type="text" class="search-input" placeholder="Search models…" oninput="filterStaffModels(this.value)" style="width:100%;box-sizing:border-box"/>
-        </div>
         <div class="tab-nav staff-tab-nav">
+          <!-- Search pill — collapses into input on tap -->
+          <div id="staff-search-pill" class="staff-search-pill" onclick="openStaffSearch()">
+            <span class="staff-search-icon">🔍</span>
+            <span class="staff-search-placeholder">Search</span>
+            <input type="text" id="staff-search-input" class="staff-search-field" placeholder="Search models…" oninput="filterStaffModels(this.value)" onblur="closeStaffSearch()" autocapitalize="none" autocorrect="off"/>
+          </div>
           <button class="tab-btn staff-tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
           <button class="tab-btn staff-tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
           <button class="tab-btn staff-tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>

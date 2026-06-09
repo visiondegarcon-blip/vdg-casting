@@ -1169,6 +1169,23 @@ function renderStaffModels(search) {
 }
 function filterStaffModels(val) { if (staffTab!=='inventory') renderStaffModels(val); }
 
+function openStaffSearch() {
+  const pill = document.getElementById('staff-search-pill');
+  const input = document.getElementById('staff-search-input');
+  if (!pill || !input) return;
+  pill.classList.add('open');
+  input.focus();
+}
+function closeStaffSearch() {
+  const pill = document.getElementById('staff-search-pill');
+  const input = document.getElementById('staff-search-input');
+  if (!pill || !input) return;
+  // keep open if there's a search value
+  if (!input.value.trim()) {
+    pill.classList.remove('open');
+  }
+}
+
 // ═══════════════════════════════════════════════
 // INVENTORY
 // ═══════════════════════════════════════════════
