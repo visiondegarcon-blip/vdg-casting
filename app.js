@@ -1120,9 +1120,9 @@ async function showStaffDashboard(user) {
   document.getElementById('panel-back-btn')?.classList.remove('hidden');
   const labels = {STYLIST:'Stylist',HAIR_STYLIST:'Hair Stylist',MAKEUP_ARTIST:'Makeup Artist'};
   document.getElementById('staff-role-display').textContent = labels[user.role]||'Staff';
-  // Inventory only for stylists (and admin). Hide for hair/makeup.
+  // Inventory visible to all staff roles
   const invTab = document.getElementById('staff-inv-tab');
-  if (invTab) invTab.style.display = (user.role==='STYLIST') ? '' : 'none';
+  if (invTab) invTab.style.display = '';
   await loadAllModels();
   await loadInventory();
   staffTab='all';

@@ -384,9 +384,9 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   .upload-grid { grid-template-columns: 1fr 1fr; }
   .tab-nav { flex-wrap: wrap; gap: 4px; }
   .tab-btn { padding: 8px 14px; }
-  /* Model cards: 2-column grid so curved edges are clearly visible */
-  .model-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-  .model-card { width: calc(50% - 6px); min-width: 0; border-radius: var(--radius-lg); padding: 14px; }
+  /* Model cards: stacked full-width on mobile */
+  .model-grid { display: flex; flex-direction: column; gap: 12px; }
+  .model-card { width: 100%; min-width: 0; border-radius: var(--radius-lg); padding: 14px; }
   /* Inventory: 2-column compact grid on mobile */
   .inv-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .inv-card-photo { aspect-ratio: 1/1; margin-bottom: 8px; }
