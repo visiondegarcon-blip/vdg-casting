@@ -596,16 +596,17 @@ function renderSignedUpPanel() {
     </div>`;
 }
 
-function openTrackerDetail(id) {
+window.openTrackerDetail = function openTrackerDetail(id) {
   const m = allModels.find(x => String(x.id) === String(id));
-  if (!m) return;
+  if (!m) { console.warn('[openTrackerDetail] model not found:', id); return; }
   const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>` : initials;
 
-  // Format last updated timestamp
+  // Format last updated timestamp — prefer updated_at, fall back to created_at
+  const rawTs = m.updated_at || m.created_at;
   let lastUpdated = '—';
-  if (m.updated_at) {
-    const d = new Date(m.updated_at);
+  if (rawTs) {
+    const d = new Date(rawTs);
     lastUpdated = d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
       + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', hour12:true });
   }
@@ -657,12 +658,12 @@ function openTrackerDetail(id) {
   document.body.appendChild(overlay);
 }
 
-function closeTrackerDetail() {
+window.closeTrackerDetail = function closeTrackerDetail() {
   const el = document.getElementById('tracker-detail-overlay');
   if (el) el.remove();
 }
 
-async function markSignupComplete(id) {
+window.markSignupComplete = async function markSignupComplete(id) {
   const btn = document.querySelector('.tracker-complete-btn');
   if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
   const { error } = await sb.from('model_profiles').update({ signup_manually_complete: true }).eq('id', id);
@@ -742,9 +743,10 @@ function modelCardHTML(m, viewerRole) {
   const genderBadge = m.gender ? `<span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender}</span>` : '';
   const igBadge     = m.instagram ? `<span class="badge badge-outline">@${m.instagram}</span>` : '';
   const ethBadge    = m.ethnicity ? `<span class="badge badge-outline">${flag} ${m.ethnicity}</span>` : '';
-  const signupBadge = !isAdmin ? (m.registered && toArr(m.face_photos).length > 0
+  const isSignupComplete = (m.registered && toArr(m.face_photos).length > 0) || m.signup_manually_complete;
+  const signupBadge = isSignupComplete
     ? `<span class="badge badge-green">✓ Signed Up</span>`
-    : `<span class="badge badge-outline">Not Signed Up</span>`) : '';
+    : `<span class="badge badge-outline" style="color:#b45309;border-color:#f6d28b;background:#fffbeb">⏳ Not Signed Up</span>`;
 
   const adminFooter = isAdmin ? `
     <div class="card-footer">
