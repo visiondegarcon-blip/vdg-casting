@@ -264,6 +264,13 @@ async function signUp() {
 async function signUpExistingModel(username, pin) {
   const nameVal = document.getElementById('signup-name').value;
   if (!nameVal) { showError('signup-error','Select your name.'); return; }
+  // Face photo is required
+  const faceInp = document.getElementById('ex-face');
+  if (!faceInp || !faceInp.files[0]) {
+    showError('signup-error','Please upload your face close-up photo — it\'s required to complete sign-up.');
+    faceInp?.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
   // Allow re-signup: only block if username is taken by a DIFFERENT profile
   const { data:ex } = await sb.from('model_profiles').select('id').eq('username',username).maybeSingle();
   if (ex && String(ex.id) !== String(nameVal)) { showError('signup-error','Username already taken.'); return; }
@@ -299,7 +306,10 @@ async function signUpExistingModel(username, pin) {
 
   const { error } = await sb.from('model_profiles').update(updates).eq('id', nameVal);
   if (error) { showError('signup-error',error.message); return; }
-  if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, nameVal);
+  // Use full name (not ID) so inventory items match model lookup by full_name
+  const sel = document.getElementById('signup-name');
+  const modelFullName = sel.options[sel.selectedIndex]?.text || String(nameVal);
+  if (outfitUrls.length) await addOutfitsToInventory(outfitUrls, modelFullName);
   document.getElementById('signup-error').textContent = '';
   toast('Account created! Sign in now.');
   showTab('signin');
@@ -314,6 +324,13 @@ async function addOutfitsToInventory(urls, modelName) {
 async function signUpNewModel(username, pin) {
   const fullName = document.getElementById('new-full-name').value.trim();
   if (!fullName) { showError('signup-error','Enter your full name.'); return; }
+  // Face photo is required
+  const faceInp = document.getElementById('new-face1');
+  if (!faceInp || !faceInp.files[0]) {
+    showError('signup-error','Please upload your face close-up photo — it\'s required to complete sign-up.');
+    faceInp?.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
   const { data:ex } = await sb.from('model_profiles').select('id').eq('username',username).maybeSingle();
   if (ex) { showError('signup-error','Username already taken.'); return; }
 
@@ -408,6 +425,7 @@ function logout() {
   document.getElementById('panel-back-btn')?.classList.add('hidden');
   document.getElementById('signin-username').value='';
   document.getElementById('signin-pin').value='';
+  document.body.style.overflow = '';
 }
 
 // ═══════════════════════════════════════════════
@@ -437,6 +455,9 @@ async function showAdminDashboard() {
   document.getElementById('admin-dashboard').classList.remove('hidden');
   document.getElementById('admin-name-display').textContent = currentUser.name;
   document.getElementById('panel-back-btn')?.classList.remove('hidden');
+  // Show "My Models" tab only for Daniel
+  const myModelsTab = document.getElementById('tab-my-models');
+  if (myModelsTab) myModelsTab.classList.toggle('hidden', currentUser?.name !== 'Daniel');
   await loadAllModels();
   await loadInventory();
   await loadStaffUsers();
@@ -446,12 +467,19 @@ async function showAdminDashboard() {
 function adminNav(page, btn) {
   document.querySelectorAll('#admin-dashboard .nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['admin-models-panel','admin-team-panel'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('admin-models-panel').classList.remove('hidden');
   const titles = { models:'All Models', team:'Team' };
   document.getElementById('admin-page-title').textContent = titles[page]||'';
-  document.getElementById('model-search').style.display = page==='models'?'':'none';
-  if (page==='models')    { document.getElementById('admin-models-panel').classList.remove('hidden'); renderAdminModels(); }
-  else if (page==='team') { document.getElementById('admin-team-panel').classList.remove('hidden'); renderTeam(); }
+  if (page === 'models') {
+    document.getElementById('model-search').style.display = '';
+    // reset to All tab
+    const allBtn = document.querySelector('#admin-models-panel .tab-btn');
+    if (allBtn) setAdminTab(allBtn, 'all');
+  } else if (page === 'team') {
+    document.getElementById('model-search').style.display = 'none';
+    const teamBtn = document.getElementById('tab-team');
+    if (teamBtn) setAdminTab(teamBtn, 'team');
+  }
 }
 
 async function setAdminTab(btn, tab) {
@@ -460,15 +488,27 @@ async function setAdminTab(btn, tab) {
   btn.classList.add('active');
   const modelsContent = document.getElementById('models-tab-content');
   const invContent    = document.getElementById('inventory-tab-content');
-  if (tab==='inventory') {
-    modelsContent.classList.add('hidden');
+  const teamContent   = document.getElementById('team-tab-content');
+  const searchEl      = document.getElementById('model-search');
+
+  // hide all tab bodies first
+  [modelsContent, invContent, teamContent].forEach(el => el?.classList.add('hidden'));
+
+  if (tab === 'inventory') {
     invContent.classList.remove('hidden');
+    if (searchEl) searchEl.style.display = 'none';
     await loadInventory();
     renderInventoryGrid('inv-grid','inv-count',true);
+  } else if (tab === 'team') {
+    teamContent.classList.remove('hidden');
+    if (searchEl) searchEl.style.display = 'none';
+    await loadStaffUsers();
+    renderTeam();
   } else {
+    // 'all', 'completed', 'mymodels'
     modelsContent.classList.remove('hidden');
-    invContent.classList.add('hidden');
-    await loadAllModels(); // always refresh model list when switching tabs
+    if (searchEl) searchEl.style.display = '';
+    await loadAllModels();
     renderAdminModels(document.getElementById('model-search')?.value||'');
   }
 }
@@ -482,6 +522,7 @@ function renderAdminModels(search) {
     list = list.filter(m=>(m.full_name||'').toLowerCase().includes(q)||(m.instagram||'').toLowerCase().includes(q)||(m.suburb||'').toLowerCase().includes(q));
   }
   if (activeTab==='completed') list = list.filter(m=>isCompleted(m));
+  if (activeTab==='mymodels') list = list.filter(m=>m.assigned_stylist===currentUser?.name);
   renderSignedUpPanel();
   renderDanielPanel();
   const grid = document.getElementById('admin-model-grid');
@@ -848,13 +889,13 @@ async function openModelPanel(id) {
       </div>
     </div>`;
 
-  // Base Fits = model's own fit photos + outfit photos (assigned inventory now lives in Stage Fit)
-  const ownFits = [...photos, ...outfitPh];
+  // Outfit Inspo = photos the model uploaded as Pinterest/inspo during signup (stored in `photos` field)
+  // Foundation fits (outfitPh) live in Stage Fit via inventory — not duplicated here
   const outfitSection = `
     <div class="collapse-section">
-      <button class="collapse-btn" onclick="toggleCollapse(this)">👕 Base Fits <span class="collapse-arrow">▾</span></button>
+      <button class="collapse-btn" onclick="toggleCollapse(this)">📸 Outfit Inspo / Pinterest <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
-        <div class="panel-section-title" style="margin-top:4px">Model's Own Base Fits</div>${photoGrid(ownFits)}
+        <div class="panel-section-title" style="margin-top:4px">Outfit Inspo Photos</div>${photoGrid(photos)}
       </div>
     </div>`;
 
@@ -1257,6 +1298,8 @@ async function showModelDashboard(model) {
   if (!wrap) return;
   document.getElementById('model-dashboard').classList.remove('hidden');
   document.getElementById('panel-back-btn')?.classList.remove('hidden');
+  // Lock body scroll so only the inner card scrolls (restores the panel feel)
+  document.body.style.overflow = 'hidden';
   await loadInventory();
   const staffNames = [model.assigned_stylist, model.assigned_hair, model.assigned_makeup].filter(Boolean);
   let staffByName = {};
@@ -1293,7 +1336,7 @@ async function showModelDashboard(model) {
         </div>
       </div>
       ${model.notes?`<div class="model-section"><div class="model-section-title">Notes from Team</div><div style="font-size:14px">${model.notes}</div></div>`:''}
-      ${modelInv.length?`<div class="model-section"><div class="model-section-title">Your Stage Fit</div><p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:14px">Wardrobe items from inventory assigned to you for the shoot.</p><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
+      ${modelInv.length?`<div class="model-section"><div class="model-section-title">Your Stage Fit</div><p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:14px">Tap any item to edit its name or details.</p><div class="stage-fit-grid">${modelInv.map(item=>`<div class="stage-fit-item" onclick="openInventoryPanel('${item.id}')" style="cursor:pointer">${item.photo_url?`<img src="${item.photo_url}"/>`:`<div style="aspect-ratio:3/4;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:28px">👕</div>`}<div class="stage-fit-label">${item.name||item.category}${item.size_qty?' · '+item.size_qty:''}</div></div>`).join('')}</div></div>`:''}
       <div class="model-section">
         <div class="model-section-title">Add More Photos</div>
         <p style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Add to your base fits, hair inspo, makeup inspo, or your own outfit any time.</p>
@@ -1334,13 +1377,72 @@ const ROLE_FIELD_MAP = { STYLIST:'assigned_stylist', HAIR_STYLIST:'assigned_hair
 function renderTeam() {
   const staffList = staffUsers
     .filter(s=>ROLE_LABELS[s.role])
-    .map(s=>({ name:s.name, role:ROLE_LABELS[s.role], field:ROLE_FIELD_MAP[s.role] }));
+    .map(s=>({ name:s.name, roleKey:s.role, role:ROLE_LABELS[s.role], field:ROLE_FIELD_MAP[s.role] }));
   const grid=document.getElementById('team-grid');
+  if (!grid) return;
   grid.innerHTML=staffList.map(s=>{
     const assigned=allModels.filter(m=>m[s.field]===s.name);
-    return `<div class="team-card"><div class="team-card-name">${s.name}</div><div class="team-card-role">${s.role} · ${assigned.length} assigned</div><div class="team-assigned-list">${assigned.length?assigned.map(m=>`<div class="team-assigned-item">${getFlag(m.ethnicity)} ${m.full_name}</div>`).join(''):'<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">None assigned</div>'}</div></div>`;
+    return `<div class="team-card" style="cursor:pointer" onclick="openStaffPanel('${s.name.replace(/'/g,"\\'")}','${s.roleKey}','${s.field}')">
+      <div class="team-card-name">${s.name}</div>
+      <div class="team-card-role">${s.role} · ${assigned.length} assigned</div>
+      <div class="team-assigned-list">${assigned.length?assigned.map(m=>`<div class="team-assigned-item">${getFlag(m.ethnicity)} ${m.full_name}</div>`).join(''):'<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">None assigned</div>'}</div>
+    </div>`;
   }).join('');
+  if (!staffList.length) grid.innerHTML = '<div style="font-size:13px;color:var(--dim);padding:24px 0">No staff signed up yet.</div>';
   renderManageUsers();
+}
+
+function openStaffPanel(name, roleKey, field) {
+  const assigned = allModels.filter(m => m[field] === name);
+  const staffMember = staffUsers.find(s => s.name === name);
+  const ig = staffMember?.instagram || '';
+  const roleLabel = ROLE_LABELS[roleKey] || roleKey;
+
+  const initials = name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  const modelList = assigned.length
+    ? assigned.map(m => {
+        const mInit = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+        return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--beige);cursor:pointer" onclick="closePanel();setTimeout(()=>openModelPanel('${m.id}'),80)">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--cream);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">
+            ${m.profile_photo ? `<img src="${m.profile_photo}" style="width:100%;height:100%;object-fit:cover"/>` : mInit}
+          </div>
+          <div>
+            <div style="font-size:14px;font-weight:500">${m.full_name||'—'}</div>
+            ${m.instagram ? `<div style="font-size:11px;color:var(--dim)">@${m.instagram}</div>` : ''}
+          </div>
+          <span style="margin-left:auto;font-size:18px;color:var(--dim)">›</span>
+        </div>`;
+      }).join('')
+    : '<div style="font-size:13px;color:var(--dim);padding:16px 0;font-family:var(--font-mono)">No models assigned yet.</div>';
+
+  document.getElementById('panel-name').textContent = name;
+  document.getElementById('panel-handle').textContent = ig ? '@'+ig : '';
+  document.getElementById('panel-flag').textContent = '';
+  document.getElementById('panel-body').innerHTML = `
+    <div style="margin-bottom:20px">
+      <div class="panel-section-title">Role</div>
+      <div style="font-size:14px;font-weight:500">${roleLabel}</div>
+    </div>
+    <div style="margin-bottom:20px">
+      <div class="panel-section-title">Assigned Models <span style="font-weight:400;color:var(--dim)">${assigned.length}</span></div>
+      ${modelList}
+    </div>
+    ${currentUser?.name === 'Daniel' ? `
+    <div style="padding-top:20px;border-top:1.5px solid var(--beige)">
+      <button class="btn btn-sm" style="background:none;border:1.5px solid var(--red);color:var(--red)" onclick="deleteStaffFromPanel('${name.replace(/'/g,"\\'")}')">🗑 Delete Account</button>
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Removes this staff member's login. Cannot be undone.</div>
+    </div>` : ''}
+  `;
+  document.getElementById('model-panel-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+async function deleteStaffFromPanel(name) {
+  const { data:user } = await sb.from('users').select('id,name').eq('name', name).maybeSingle();
+  if (!user) { toast('User not found', true); return; }
+  await deleteUser(user.id, user.name);
+  closePanel();
 }
 
 async function renderManageUsers() {

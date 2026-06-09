@@ -530,7 +530,10 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 .panel-back-btn {
   position: fixed;
   bottom: 28px;
-  right: 28px;
+  left: 28px;
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
+  -webkit-backface-visibility: hidden;
   width: 50px;
   height: 50px;
   border-radius: 50%;

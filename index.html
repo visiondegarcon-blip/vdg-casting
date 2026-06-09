@@ -551,6 +551,8 @@
           <button class="tab-btn active" onclick="setAdminTab(this,'all')">All</button>
           <button class="tab-btn" onclick="setAdminTab(this,'completed')">Completed</button>
           <button class="tab-btn" onclick="setAdminTab(this,'inventory')">Inventory</button>
+          <button class="tab-btn" id="tab-team" onclick="setAdminTab(this,'team')">Team</button>
+          <button class="tab-btn hidden" id="tab-my-models" onclick="setAdminTab(this,'mymodels')">My Models</button>
         </div>
         <div id="models-tab-content">
           <div id="signed-up-panel"></div>
@@ -564,10 +566,10 @@
           </div>
           <div class="inv-grid" id="inv-grid"></div>
         </div>
-      </div>
-      <div id="admin-team-panel" class="panel-content hidden">
-        <div class="team-grid" id="team-grid"></div>
-        <div id="manage-users-section" style="margin-top:36px"></div>
+        <div id="team-tab-content" class="hidden">
+          <div class="team-grid" id="team-grid"></div>
+          <div id="manage-users-section" style="margin-top:36px"></div>
+        </div>
       </div>
     </main>
   </section>
