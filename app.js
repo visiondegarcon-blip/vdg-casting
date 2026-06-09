@@ -1442,8 +1442,12 @@ function previewEditProfile(input) {
 
 async function saveEditDetails() {
   if (!editDetailsModelId) return;
-  const errEl = document.getElementById('edit-details-error');
-  errEl.textContent = 'Saving…';
+  const errEl  = document.getElementById('edit-details-error');
+  const saveBtn = document.querySelector('.edit-details-footer .btn-brown');
+  errEl.textContent = '';
+  if (saveBtn) { saveBtn.textContent = 'Saving…'; saveBtn.disabled = true; }
+
+  console.log('[EditDetails] saving for id:', editDetailsModelId, typeof editDetailsModelId);
 
   const updates = {
     instagram:     document.getElementById('edit-instagram').value.trim().replace(/^@/,''),
@@ -1508,23 +1512,30 @@ async function saveEditDetails() {
     }));
   }
 
-  const { error } = await sb.from('model_profiles').update(updates).eq('id', editDetailsModelId);
+  const { error, data: updateData, count } = await sb.from('model_profiles')
+    .update(updates)
+    .eq('id', editDetailsModelId)
+    .select();
+  console.log('[EditDetails] update result:', { error, updateData, count });
+
+  if (saveBtn) { saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; }
+
   if (error) { errEl.textContent = error.message; return; }
+  if (!updateData || updateData.length === 0) {
+    errEl.textContent = 'Save failed — no matching record found. Please sign out and back in.';
+    console.error('[EditDetails] update matched 0 rows — id mismatch?', editDetailsModelId);
+    return;
+  }
 
   errEl.textContent = '';
 
-  // Update allModels cache so staff see changes immediately without re-login
-  const { data: fresh } = await sb.from('model_profiles').select('*').eq('id', editDetailsModelId).single();
-  if (fresh) {
-    const idx = allModels.findIndex(m => String(m.id) === String(editDetailsModelId));
-    if (idx !== -1) allModels[idx] = fresh; else allModels.push(fresh);
-    toast('Details saved ✓');
-    closeEditDetails();
-    showModelDashboard(fresh);
-  } else {
-    toast('Details saved ✓');
-    closeEditDetails();
-  }
+  // Use the returned row directly — no extra fetch needed
+  const fresh = updateData[0];
+  const idx = allModels.findIndex(m => String(m.id) === String(editDetailsModelId));
+  if (idx !== -1) allModels[idx] = fresh; else allModels.push(fresh);
+  toast('Details saved ✓');
+  closeEditDetails();
+  showModelDashboard(fresh);
 }
 
 // ═══════════════════════════════════════════════
