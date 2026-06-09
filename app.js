@@ -2003,19 +2003,18 @@ function toTasks(v) {
 }
 function pendingTasks(m) { return toTasks(m?.tasks).filter(t => !t.done && taskReg(t.key)); }
 
-// ── ADMIN: assign-task modal (single model or bulk to all signed-up) ──
+// ── ADMIN: assign-task modal (single model or bulk to all models) ──
 let _taskMode = 'single', _taskModelId = null;
 
 function openTaskModal(mode, modelId) {
   _taskMode = mode; _taskModelId = modelId || null;
   const overlay = document.getElementById('task-modal-overlay');
   if (!overlay) return;
-  const signedUp = allModels.filter(isSignupComplete);
   const title = document.getElementById('task-modal-title');
   const sub   = document.getElementById('task-modal-sub');
   if (mode === 'bulk') {
     title.textContent = 'Assign Task to All';
-    sub.textContent = `Adds the selected task(s) to all ${signedUp.length} signed-up model${signedUp.length!==1?'s':''}. Models who already finished a task keep their answer.`;
+    sub.textContent = `Adds the selected task(s) to all ${allModels.length} model${allModels.length!==1?'s':''}. Models who already finished a task keep their answer.`;
   } else {
     const m = allModels.find(x => String(x.id) === String(modelId));
     title.textContent = 'Assign Task';
@@ -2042,7 +2041,7 @@ async function submitTaskAssign() {
   const newOnes = keys.map(key => ({ key, note, done:false, assigned_at:stamp }));
 
   if (_taskMode === 'bulk') {
-    const targets = allModels.filter(isSignupComplete);
+    const targets = allModels;
     await Promise.all(targets.map(async m => {
       const merged = mergeTasks(m.tasks, newOnes);
       const { error } = await sb.from('model_profiles').update({ tasks: merged }).eq('id', m.id);
