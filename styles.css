@@ -701,6 +701,11 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 .tracker-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tracker-detail-label { font-size: 11px; font-family: var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0; }
 .tracker-detail-value { font-size: 12px; font-weight: 600; color: var(--text); text-align: right; }
+/* ── Panel signup toggle row (admin — always visible at top of model panel) ── */
+.panel-signup-toggle-row { display: flex; align-items: center; gap: 10px; padding: 10px 20px; background: var(--cream); border-bottom: 1.5px solid var(--border); }
+.panel-signup-toggle-label { font-size: 11px; font-family: var(--font-mono); font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: .05em; flex-shrink: 0; }
+.panel-signup-toggle-lastupdate { font-size: 10px; font-family: var(--font-mono); color: var(--dim); margin-left: auto; text-align: right; }
+
 .tracker-detail-header-switch { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .toggle-label { font-size: 11px; font-family: var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
 .toggle-switch { display: flex; align-items: center; position: relative; cursor: pointer; height: 22px; }

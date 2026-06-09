@@ -560,7 +560,7 @@ function renderSignedUpPanel() {
     const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
     const xBtn     = dismissable ? `<button class="signed-up-dismiss" onclick="event.stopPropagation();dismissSignup('${m.id}')" title="Dismiss">×</button>` : '';
-    const clickFn  = dismissable ? `openModelPanel('${m.id}')` : `openTrackerDetail('${m.id}')`;
+    const clickFn  = `openModelPanel('${m.id}')`;
     return `<div class="signed-up-card" onclick="${clickFn}">
       ${xBtn}
       <div class="signed-up-avatar">${avatar}</div>
@@ -596,82 +596,12 @@ function renderSignedUpPanel() {
     </div>`;
 }
 
-window.openTrackerDetail = function openTrackerDetail(id) {
-  const m = allModels.find(x => String(x.id) === String(id));
-  if (!m) { console.warn('[openTrackerDetail] model not found:', id); return; }
-  const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>` : initials;
-
-  // Format last updated timestamp — prefer updated_at, fall back to created_at
-  const rawTs = m.updated_at || m.created_at;
-  let lastUpdated = '—';
-  if (rawTs) {
-    const d = new Date(rawTs);
-    lastUpdated = d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
-      + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', hour12:true });
-  }
-
-  const signedUpStatus = m.registered ? '✅ Registered' : '⏳ Not registered';
-  const hasFace = toArr(m.face_photos).length > 0;
-  const isComplete = m.signup_manually_complete;
-
-  const overlay = document.createElement('div');
-  overlay.className = 'tracker-detail-overlay';
-  overlay.id = 'tracker-detail-overlay';
-  overlay.innerHTML = `
-    <div class="tracker-detail-modal">
-      <button class="tracker-detail-close" onclick="closeTrackerDetail()">×</button>
-      <div class="tracker-detail-header">
-        <div class="tracker-detail-avatar">${avatar}</div>
-        <div style="flex: 1;">
-          <div style="font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--text)">${m.full_name||'—'}</div>
-          <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Last updated: ${lastUpdated}</div>
-        </div>
-        <div class="tracker-detail-header-switch">
-          <label class="toggle-switch">
-            <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="toggleSignupComplete('${m.id}', this)"/>
-            <span class="toggle-slider"></span>
-          </label>
-          <span class="toggle-label">${isComplete ? 'Complete' : 'Pending'}</span>
-        </div>
-      </div>
-      <div class="tracker-detail-body">
-        <div class="tracker-detail-row">
-          <span class="tracker-detail-label">Sign Up Status</span>
-          <span class="tracker-detail-value">${signedUpStatus}</span>
-        </div>
-        <div class="tracker-detail-row">
-          <span class="tracker-detail-label">Face Photo</span>
-          <span class="tracker-detail-value">${hasFace ? '✅ Uploaded' : '⏳ Missing'}</span>
-        </div>
-        <div class="tracker-detail-row">
-          <span class="tracker-detail-label">Instagram</span>
-          <span class="tracker-detail-value">${m.instagram ? '@'+m.instagram : '—'}</span>
-        </div>
-        <div class="tracker-detail-row">
-          <span class="tracker-detail-label">Phone</span>
-          <span class="tracker-detail-value">${m.phone||'—'}</span>
-        </div>
-      </div>
-      <div class="tracker-detail-footer">
-        <button class="tracker-view-btn" onclick="closeTrackerDetail();openModelPanel('${m.id}')">
-          View Full Profile →
-        </button>
-      </div>
-    </div>`;
-  overlay.addEventListener('click', e => { if (e.target === overlay) closeTrackerDetail(); });
-  document.body.appendChild(overlay);
-}
-
-window.closeTrackerDetail = function closeTrackerDetail() {
-  const el = document.getElementById('tracker-detail-overlay');
-  if (el) el.remove();
-}
 
 window.toggleSignupComplete = async function toggleSignupComplete(id, checkbox) {
   const newState = checkbox.checked;
   checkbox.disabled = true;
-  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: newState }).eq('id', id);
+  const now = new Date().toISOString();
+  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: newState, updated_at: now }).eq('id', id);
   if (error) {
     toast(error.message, true);
     checkbox.checked = !newState;
@@ -679,8 +609,19 @@ window.toggleSignupComplete = async function toggleSignupComplete(id, checkbox) 
     return;
   }
   const m = allModels.find(x => String(x.id) === String(id));
-  if (m) m.signup_manually_complete = newState;
+  if (m) { m.signup_manually_complete = newState; m.updated_at = now; }
   checkbox.disabled = false;
+
+  // Update the panel header label and last-updated text live
+  const lbl = document.getElementById('panel-signup-toggle-label');
+  const upd = document.getElementById('panel-signup-toggle-lastupdate');
+  if (lbl) lbl.textContent = newState ? 'Signed Up' : 'Not Signed Up';
+  if (upd) {
+    const d = new Date(now);
+    upd.textContent = 'Updated ' + d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+      + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', hour12:true });
+  }
+
   renderSignedUpPanel();
   toast(newState ? 'Marked as complete ✓' : 'Marked as pending ✓');
 }
@@ -1097,6 +1038,33 @@ async function openModelPanel(id) {
   }
 
   document.getElementById('panel-body').innerHTML = body;
+
+  // ── Signup toggle row (admin only) ──
+  const toggleRow = document.getElementById('panel-signup-toggle-row');
+  if (toggleRow) {
+    if (isAdmin) {
+      window._panelModelId = String(m.id);
+      const inp = document.getElementById('panel-signup-toggle-input');
+      const lbl = document.getElementById('panel-signup-toggle-label');
+      const upd = document.getElementById('panel-signup-toggle-lastupdate');
+      const isComplete = !!(m.signup_manually_complete);
+      if (inp) inp.checked = isComplete;
+      if (lbl) lbl.textContent = isComplete ? 'Signed Up' : 'Not Signed Up';
+      if (upd) {
+        if (m.updated_at) {
+          const d = new Date(m.updated_at);
+          upd.textContent = 'Updated ' + d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
+            + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', hour12:true });
+        } else {
+          upd.textContent = 'Last updated: N/A';
+        }
+      }
+      toggleRow.classList.remove('hidden');
+    } else {
+      toggleRow.classList.add('hidden');
+    }
+  }
+
   document.getElementById('model-panel-overlay').classList.remove('hidden');
   document.body.style.overflow='hidden';
 }

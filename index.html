@@ -626,6 +626,14 @@
         <div class="panel-flag" id="panel-flag"></div>
         <button class="panel-close" onclick="closePanel()">✕</button>
       </div>
+      <div class="panel-signup-toggle-row hidden" id="panel-signup-toggle-row">
+        <span class="panel-signup-toggle-label" id="panel-signup-toggle-label">Signed Up</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="panel-signup-toggle-input" onchange="toggleSignupComplete(window._panelModelId, this)"/>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="panel-signup-toggle-lastupdate" id="panel-signup-toggle-lastupdate"></span>
+      </div>
       <div class="panel-body" id="panel-body"></div>
     </div>
   </div>
@@ -901,6 +909,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
