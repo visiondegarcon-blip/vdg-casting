@@ -827,6 +827,67 @@
         </div>
         <!-- Notes -->
         <div class="form-group"><label>Notes for the team</label><textarea id="edit-model-note" placeholder="Anything for the hair, makeup or styling team…" rows="3"></textarea></div>
+
+        <!-- Photo Uploads -->
+        <div style="border-top: 1.5px solid var(--border); margin-top: 24px; padding-top: 20px;">
+          <div style="font-family: var(--font-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--brown); margin-bottom: 16px;">Update Your Photos</div>
+
+          <!-- Face Photos -->
+          <div class="form-group">
+            <label>Face Close-Up</label>
+            <div class="upload-zone" onclick="document.getElementById('edit-face-upload').click()">
+              <input type="file" id="edit-face-upload" multiple accept="image/*" style="display:none"/>
+              <div class="upload-zone-icon">📸</div>
+              <div class="upload-zone-text">Tap to upload</div>
+            </div>
+            <div id="edit-face-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+          </div>
+
+          <!-- Base Fits -->
+          <div class="form-group">
+            <label>Base Fits</label>
+            <div class="upload-zone" onclick="document.getElementById('edit-fit-upload').click()">
+              <input type="file" id="edit-fit-upload" multiple accept="image/*" style="display:none"/>
+              <div class="upload-zone-icon">👗</div>
+              <div class="upload-zone-text">Tap to upload</div>
+            </div>
+            <div id="edit-fit-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+          </div>
+
+          <!-- Hair Inspo -->
+          <div class="form-group">
+            <label>Hair Inspo</label>
+            <div class="upload-zone" onclick="document.getElementById('edit-hair-upload').click()">
+              <input type="file" id="edit-hair-upload" multiple accept="image/*" style="display:none"/>
+              <div class="upload-zone-icon">💇</div>
+              <div class="upload-zone-text">Tap to upload</div>
+            </div>
+            <div id="edit-hair-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+          </div>
+
+          <!-- Makeup Inspo -->
+          <div class="form-group">
+            <label>Makeup Inspo</label>
+            <div class="upload-zone" onclick="document.getElementById('edit-mua-upload').click()">
+              <input type="file" id="edit-mua-upload" multiple accept="image/*" style="display:none"/>
+              <div class="upload-zone-icon">💄</div>
+              <div class="upload-zone-text">Tap to upload</div>
+            </div>
+            <div id="edit-mua-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+          </div>
+
+          <!-- Outfit Photos -->
+          <div class="form-group">
+            <label>Your Own Outfit</label>
+            <div class="upload-zone" onclick="document.getElementById('edit-outfit-upload').click()">
+              <input type="file" id="edit-outfit-upload" multiple accept="image/*" style="display:none"/>
+              <div class="upload-zone-icon">👕</div>
+              <div class="upload-zone-text">Tap to upload</div>
+            </div>
+            <div id="edit-outfit-status" style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px"></div>
+          </div>
+        </div>
+
         <div id="edit-details-error" class="error-msg"></div>
       </div>
       <div class="edit-details-footer">

@@ -1472,6 +1472,31 @@ async function saveEditDetails() {
     if (u.length) updates.profile_photo = u[0];
   }
 
+  // Get current model data to merge photo arrays
+  const { data: currentModel } = await sb.from('model_profiles').select('face_photos,photos,hair_photos,mua_photos,outfit_photos').eq('id', editDetailsModelId).single();
+
+  // Upload and merge photo arrays
+  const photoFields = [
+    { inputId: 'edit-face-upload', field: 'face_photos', statusId: 'edit-face-status', folder: 'face', max: 3 },
+    { inputId: 'edit-fit-upload', field: 'photos', statusId: 'edit-fit-status', folder: 'fit', max: 3 },
+    { inputId: 'edit-hair-upload', field: 'hair_photos', statusId: 'edit-hair-status', folder: 'hair', max: 3 },
+    { inputId: 'edit-mua-upload', field: 'mua_photos', statusId: 'edit-mua-status', folder: 'mua', max: 3 },
+    { inputId: 'edit-outfit-upload', field: 'outfit_photos', statusId: 'edit-outfit-status', folder: 'outfit', max: 3 },
+  ];
+
+  for (const { inputId, field, statusId, folder, max } of photoFields) {
+    const input = document.getElementById(inputId);
+    if (input && input.files.length) {
+      const uploaded = await uploadFiles(Array.from(input.files), editDetailsModelId, folder, max);
+      if (uploaded.length) {
+        const existing = toArr(currentModel?.[field]) || [];
+        updates[field] = [...existing, ...uploaded];
+        const statusEl = document.getElementById(statusId);
+        if (statusEl) statusEl.textContent = `✓ ${uploaded.length} uploaded`;
+      }
+    }
+  }
+
   const { error } = await sb.from('model_profiles').update(updates).eq('id', editDetailsModelId);
   if (error) { errEl.textContent = error.message; return; }
 

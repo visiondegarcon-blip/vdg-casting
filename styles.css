@@ -151,8 +151,9 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 
 /* Edit Details button on model dashboard (sits on dark hero background) */
 .edit-details-btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 9px 18px;
   background: rgba(255,255,255,0.10);
@@ -165,6 +166,8 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   cursor: pointer;
   transition: all .2s;
   margin-top: 12px;
+  width: fit-content;
+  white-space: nowrap;
 }
 .edit-details-btn:hover {
   background: rgba(196,168,130,0.25);
