@@ -1245,6 +1245,13 @@ function openInventoryPanel(itemId) {
     saveBtn.onclick = () => updateInvItem(item.id);
   }
 
+  // Show delete button (only visible when editing an existing item)
+  const delBtn = document.getElementById('inv-delete-btn');
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.onclick = () => deleteInvItem(item.id);
+  }
+
   document.getElementById('inv-modal-overlay').classList.remove('hidden');
 }
 
@@ -1285,6 +1292,9 @@ function openInvModal() {
   // Reset save button to Add mode
   const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
   if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
+  // Hide delete button for new items
+  const delBtn = document.getElementById('inv-delete-btn');
+  if (delBtn) delBtn.classList.add('hidden');
   const sel=document.getElementById('inv-model-assign');
   sel.innerHTML='<option value="">Unassigned</option>';
   if (currentUser?.role==='MODEL') {
@@ -1317,6 +1327,160 @@ async function saveInvItem() {
   await loadInventory();
   if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
   if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+}
+
+// ═══════════════════════════════════════════════
+// DELETE INVENTORY ITEM
+// ═══════════════════════════════════════════════
+async function deleteInvItem(itemId) {
+  if (!confirm('Delete this item? This cannot be undone.')) return;
+  const { error } = await sb.from('inventory').delete().eq('id', itemId);
+  if (error) { toast('Error: ' + error.message, true); return; }
+  toast('Item deleted');
+  document.getElementById('inv-modal-overlay').classList.add('hidden');
+  const delBtn = document.getElementById('inv-delete-btn');
+  if (delBtn) delBtn.classList.add('hidden');
+  const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
+  if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
+  await loadInventory();
+  if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+}
+
+// ═══════════════════════════════════════════════
+// EDIT DETAILS PANEL (model self-edit)
+// ═══════════════════════════════════════════════
+let editDetailsModelId = null;
+
+function openEditDetails(model) {
+  editDetailsModelId = model.id;
+
+  // Profile photo preview
+  const prev = document.getElementById('edit-profile-preview');
+  if (prev) {
+    if (model.profile_photo) {
+      prev.innerHTML = `<img src="${model.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/><input type="file" id="edit-profile-input" accept="image/*" onchange="previewEditProfile(this)" style="display:none"/>`;
+    } else {
+      prev.innerHTML = `📸<input type="file" id="edit-profile-input" accept="image/*" onchange="previewEditProfile(this)" style="display:none"/>`;
+    }
+  }
+
+  // Populate all fields
+  setVal('edit-instagram', model.instagram || '');
+  setVal('edit-phone', model.phone || '');
+  setVal('edit-age', model.age || '');
+  setVal('edit-gender', model.gender || 'Male');
+  setVal('edit-ethnicity', model.ethnicity || '');
+  setVal('edit-height', model.height || '');
+  setVal('edit-top-size', model.top_size || 'M');
+  setVal('edit-jean-size', model.jean_size || '');
+  setVal('edit-suburb', model.suburb || '');
+  setVal('edit-style', model.style || '');
+  setVal('edit-cultural', model.cultural_piece || 'no');
+  setVal('edit-cultural-desc', model.cultural_desc || '');
+  toggleEditCultural(model.cultural_piece || 'no');
+  setVal('edit-talent', model.talent ? 'true' : 'false');
+  setVal('edit-talent-desc', model.talent_desc || '');
+  toggleEditTalent(model.talent ? 'true' : 'false');
+  setVal('edit-free', model.free_5july !== false ? 'true' : 'false');
+  setVal('edit-hair-ok', model.hair_ok !== false ? 'true' : 'false');
+  setVal('edit-hair-texture', model.hair_texture || '');
+  setVal('edit-makeup-self', model.makeup_self === true ? 'true' : model.makeup_self === false ? 'false' : 'skip');
+  setVal('edit-agency', model.agency || 'no');
+  setVal('edit-model-note', model.model_note || '');
+  const noOutfit = document.getElementById('edit-no-own-outfit');
+  if (noOutfit) noOutfit.checked = !!model.no_own_outfit;
+
+  // Hair length button group
+  const hlGroup = document.getElementById('edit-hair-length-group');
+  const hlVal = document.getElementById('edit-hair-length-group-val');
+  if (hlGroup && hlVal) {
+    hlVal.value = model.hair_length || '';
+    hlGroup.querySelectorAll('.btn-group-option').forEach(btn => {
+      btn.classList.toggle('active', btn.textContent === model.hair_length);
+    });
+  }
+
+  document.getElementById('edit-details-error').textContent = '';
+  document.getElementById('edit-details-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEditDetails() {
+  document.getElementById('edit-details-overlay').classList.add('hidden');
+  document.body.style.overflow = 'hidden'; // model dashboard keeps body locked
+}
+
+function toggleEditCultural(val) {
+  document.getElementById('edit-cultural-desc-wrap')?.classList.toggle('hidden', val === 'no');
+}
+function toggleEditTalent(val) {
+  document.getElementById('edit-talent-desc-wrap')?.classList.toggle('hidden', val !== 'true');
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = val;
+}
+
+function previewEditProfile(input) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const prev = document.getElementById('edit-profile-preview');
+    if (prev) prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/><input type="file" id="edit-profile-input" accept="image/*" onchange="previewEditProfile(this)" style="display:none"/>`;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function saveEditDetails() {
+  if (!editDetailsModelId) return;
+  const errEl = document.getElementById('edit-details-error');
+  errEl.textContent = 'Saving…';
+
+  const updates = {
+    instagram:     document.getElementById('edit-instagram').value.trim().replace(/^@/,''),
+    phone:         document.getElementById('edit-phone').value.trim(),
+    age:           parseInt(document.getElementById('edit-age').value) || null,
+    gender:        document.getElementById('edit-gender').value,
+    ethnicity:     document.getElementById('edit-ethnicity').value,
+    height:        document.getElementById('edit-height').value.trim(),
+    top_size:      document.getElementById('edit-top-size').value,
+    jean_size:     document.getElementById('edit-jean-size').value.trim(),
+    suburb:        document.getElementById('edit-suburb').value.trim(),
+    style:         document.getElementById('edit-style').value.trim(),
+    cultural_piece:document.getElementById('edit-cultural').value,
+    cultural_desc: document.getElementById('edit-cultural-desc').value.trim(),
+    talent:        document.getElementById('edit-talent').value === 'true',
+    talent_desc:   document.getElementById('edit-talent-desc').value.trim(),
+    free_5july:    document.getElementById('edit-free').value === 'true',
+    hair_ok:       document.getElementById('edit-hair-ok').value === 'true',
+    hair_texture:  document.getElementById('edit-hair-texture').value || null,
+    hair_length:   document.getElementById('edit-hair-length-group-val').value || null,
+    makeup_self:   document.getElementById('edit-makeup-self').value === 'true' ? true : document.getElementById('edit-makeup-self').value === 'false' ? false : null,
+    agency:        document.getElementById('edit-agency').value,
+    no_own_outfit: document.getElementById('edit-no-own-outfit').checked,
+    model_note:    document.getElementById('edit-model-note').value.trim(),
+  };
+
+  // Upload new profile photo if selected
+  const profInput = document.getElementById('edit-profile-input');
+  if (profInput && profInput.files[0]) {
+    const u = await uploadFiles([profInput.files[0]], editDetailsModelId, 'profile');
+    if (u.length) updates.profile_photo = u[0];
+  }
+
+  const { error } = await sb.from('model_profiles').update(updates).eq('id', editDetailsModelId);
+  if (error) { errEl.textContent = error.message; return; }
+
+  errEl.textContent = '';
+  toast('Details saved ✓');
+  closeEditDetails();
+
+  // Refresh model dashboard with updated data
+  const { data: fresh } = await sb.from('model_profiles').select('*').eq('id', editDetailsModelId).single();
+  if (fresh) showModelDashboard(fresh);
 }
 
 // ═══════════════════════════════════════════════
@@ -1354,6 +1518,7 @@ async function showModelDashboard(model) {
         <div class="model-hero-status">
           <span class="model-hero-flag">${flag}</span>
         </div>
+        <button class="edit-details-btn" onclick='openEditDetails(${JSON.stringify(model)})'>✏️ Edit Details</button>
       </div>
     </div>
     <div class="model-profile-body">
