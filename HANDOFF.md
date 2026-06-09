@@ -1,290 +1,345 @@
-# HANDOFF — 5 July Model Casting/Styling App
+# VDG Casting Portal — Claude Handoff Document
 
-## 1. PROJECT OVERVIEW
-
-**What it does:** A vanilla JS single-page app used to manage models, staff (stylists, hair stylists, makeup artists, admin), and wardrobe inventory for a live fashion event called "5 July." Models sign up and upload photos (fits, hair/makeup inspo, outfit photos, profile photo). Admin approves models, assigns them to stylist/hair/makeup staff, tracks a completion checklist (outfit/hair/makeup done), and manages a shared clothing inventory that can be assigned to specific models. Staff log in to see their assigned models and update status (working/pending/rejected).
-
-**Tech stack:**
-- Plain HTML/CSS/JS — no framework, no build step, no bundler
-- Single JS file: `app.js` (~1109 lines), single `index.html`, single `styles.css`
-- Supabase (Postgres + Storage) as backend — accessed directly from the browser via `@supabase/supabase-js` CDN client (`window.supabase.createClient(...)`)
-- Deployed via **Vercel**, connected to a **GitHub repo** (push to GitHub → auto-deploy on Vercel)
-
-**Architecture:**
-- One big `app.js` containing everything: auth, signup, all dashboards (admin/staff/model), modals/panels, inventory, uploads — all rendered via template-literal `innerHTML` injection (no virtual DOM, no components)
-- Role-based views driven by `currentUser.role` (`ADMIN`, `STYLIST`, `HAIR_STYLIST`, `MAKEUP_ARTIST`, `MODEL`)
-- "Panels"/"modals" are just `<div class="...-overlay hidden">` wrappers toggled via `.classList.remove/add('hidden')` (CSS: `.hidden { display: none !important; }`)
-
-**Key integrations:**
-- **Supabase Postgres** — tables: `model_profiles`, `inventory`, `users` (staff/admin accounts)
-- **Supabase Storage** — bucket `model-photos`, used for profile photos, fit/hair/mua/outfit/face photos, and inventory item photos
-- **Supabase client config** is hardcoded at the top of `app.js`:
-  ```js
-  const SUPABASE_URL = "https://dyruvkzuasaiofkxdvid.supabase.co";
-  const SUPABASE_KEY = "sb_publishable_tKMXDxTa-uICYsBE3OUh7A_RsoGFhhf";
-  ```
+> Written for the next Claude instance. Read this before touching any file.
 
 ---
 
-## 2. CURRENT STATE
+## 1. Project Overview
 
-### Working:
-- Sign in / sign up (model "new" and "existing" flows, staff/admin flows)
-- Photo uploads to Supabase Storage (was previously broken due to storage policies — now fixed)
-- Admin model grid, staff model grid, filtering/search/tabs
-- Model card click → opens detail panel **(FIXED this session — see Issue #1)**
-- Inventory grid renders with photos
-- Inventory item click → opens edit panel **(FIXED this session — see Issue #2)**
-- Approve/assign/checklist/tag/notes functionality in the admin model panel
-- `toArr()`/`normaliseModel()`/`parseJsonArray()` helpers correctly normalize Supabase array-type columns that sometimes return as JSON-text strings
+### What It Is
+A private web-based casting management portal for **VDG (Vision De Garçon)**, a Brisbane fashion/creative collective. Built for a single event: **July 5, 2026**.
 
-### Implemented but with a remaining bug:
-- The model detail panel's **collapsible photo sections** (Face Photos / Outfit / Hair & Makeup Inspo) render as functionally-correct `<button class="collapse-btn">` elements with the right text in the DOM — but **the text is visually invisible**, appearing as blank horizontal bars (see Issue #3 — UNRESOLVED).
+### What It Does
+- Models self-register, upload photos (face, outfit inspo, hair inspo, makeup inspo, own outfits), and fill in their details (sizes, availability, hair texture, etc.)
+- Staff (stylists, hair stylists, makeup artists) log in and browse models, claim them ("Work With"), mark pending, or reject
+- Admin (Daniel) manages everything: assigns staff to models, tracks sign-up completion, manages inventory (physical clothing/accessories), adds internal notes/tags, exports roster CSV
+- Models can view their assigned team, their stage fit (inventory assigned to them), and edit their profile after signup
 
-### Not yet implemented (explicitly deferred by user, "do later"):
-- (a) Change signup wording from "Your Own Outfit Photos" to something like "current outfits you have that fit the streetwear/traditional theme" + auto-upload those photos to inventory + auto-assign to that model
-- (b) Redesign the **model's own dashboard** (`showModelDashboard`/`#model-profile-wrap`) to be a **centered, rounded-corner popup/modal** (like `model-panel-overlay` is for admin), with internal scrolling instead of whole-page scroll, and a banner at top showing which staff (stylist/hair/makeup) are assigned to that model
-- (c) Add an explanatory caption near "Final Stage Fits" / "Assigned Inventory" sections clarifying to stylists/admin that these are wardrobe items from inventory assigned to that model for the shoot
+### Who Uses It
+| Role | Name(s) | What They Do |
+|------|---------|--------------|
+| ADMIN | Daniel | Full access — assigns, tracks, manages, edits everything |
+| STYLIST | Daniel, Dee, Komi, Richelle | Browse models, claim for styling |
+| HAIR_STYLIST | Christie, Maria, Neza | Browse models, claim for hair, see hair details |
+| MAKEUP_ARTIST | Rebecca | Browse models, claim for makeup |
+| MODEL | All cast models | Self-register, upload photos, view their profile |
+
+### Business Purpose
+Replaces a Google Forms + spreadsheet workflow. The goal is that all styling, hair, and makeup staff can see every model's photos and details in one place, assignments are visible to everyone in real time, and Daniel has a single dashboard to track who has and hasn't completed the sign-up process.
 
 ---
 
-## 3. MAJOR ISSUES ENCOUNTERED
+## 2. Architecture & Structure
 
-### Issue #1: Model detail panel wouldn't open (crash on click) — ✅ FIXED
-**Symptoms:** Clicking a model card (as admin or staff) did nothing — no panel appeared, no visible error to the user.
-
-**Root cause:** Supabase was returning array-type Postgres columns (`photos`, `hair_photos`, `mua_photos`, `outfit_photos`, `face_photos`, `tags`) as **JSON-encoded strings** instead of real JS arrays in some cases. The `openModelPanel`/`showModelDashboard` functions called `.map()` and spread (`[...arr]`) directly on these values. Calling `.map()` on a string throws `TypeError: arr.map is not a function`. Because this happened mid-template-literal-construction, the exception fired *before* the line that removes the `.hidden` class — so the panel silently never appeared. Only visible via browser console.
-
-**How diagnosed:** User pasted the exact console error:
+### Files
 ```
-app.js:581 Uncaught (in promise) TypeError: arr.map is not a function
-    at photoGrid (app.js:581:74)
-    at openModelPanel (app.js:586:36)
-    at HTMLDivElement.onclick ((index):1:1)
+app vdg files/
+├── index.html      — Single HTML file. All UI structure, all forms, all overlays.
+├── app.js          — All JavaScript. Auth, data loading, rendering, uploads, DB calls.
+├── styles.css      — All styling. CSS variables, component styles, responsive layout.
+└── HANDOFF.md      — This file.
 ```
 
-**Exact fix applied:**
-1. Added a normalization helper near the top of `app.js`:
-   ```js
-   function toArr(v) {
-     if (Array.isArray(v)) return v;
-     if (typeof v === 'string' && v.trim().startsWith('[')) {
-       try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
-     }
-     return [];
-   }
-   ```
-   (A near-identical `parseJsonArray` helper also exists, used inside `normaliseModel()` — both do the same thing; the codebase ended up with two equivalent helpers, which is harmless but worth noting/consolidating later.)
-2. In `openModelPanel` (line ~605-609, ~631): wrapped `photos`, `hairPh`, `muaPh`, `facePh`, `tags`, `outfitPh` in `toArr(...)`
-3. In `showModelDashboard` (line ~986-989): wrapped `hairPh`, `muaPh`, `outfitPh` in `toArr(...)` (note: `photos` on line 986 is still `model.photos || []` — NOT wrapped in `toArr`, but this hasn't caused issues so far since `normaliseModel()` is called before `showModelDashboard` in the sign-in path)
-4. Fixed a second related bug at line ~1039: a template literal was directly calling `model.outfit_photos.map(...)` instead of using the normalized `outfitPh` variable — changed both occurrences of `model.outfit_photos` → `outfitPh`
+**This is a deliberately minimal stack.** No framework, no build step, no bundler. Vanilla JS + Supabase JS SDK loaded via CDN. Everything is in three files.
 
-**Files changed:** `app.js` only (`/Users/admin/Desktop/app vdg files/app (1).js` and the version pushed to GitHub)
+### Frontend Structure
+- **Single page app** — all sections exist in the DOM simultaneously, shown/hidden via `.hidden` class
+- **Sections:** `#auth-screen`, `#admin-dashboard`, `#staff-dashboard`, `#model-dashboard`
+- **Overlays:** `#model-panel-overlay` (model detail panel), `#inv-modal-overlay` (add/edit inventory), `#edit-details-overlay` (model self-edit panel)
+- **No routing** — state is managed entirely in JS variables
+- **Cache busting** — `app.js` is loaded as `app.js?v=N` in index.html. **Increment `v=N` every deploy** or browsers will serve stale JS. Current version: v=7.
 
-**Verification:** User confirmed via screenshot that the panel now opens and displays model details correctly (saw "don diddy" model's full panel with Note from Model, Details, Assignment & Status sections).
+### Backend: Supabase
+- **Project URL:** `https://dyruvkzuasaiofkxdvid.supabase.co`
+- **Key:** `sb_publishable_tKMXDxTa-uICYsBE3OUh7A_RsoGFhhf` (anon/publishable key, safe for client-side)
+- **No RLS enabled** (intentional for MVP — internal app with trusted users only)
 
-**Lessons learned:** Always normalize Postgres array-column data at the boundary (right after fetching from Supabase) rather than at every point of use — `normaliseModel()` already does this for the admin model list (`loadAllModels`), but `signIn()`'s direct fetch and a few other code paths bypassed it, requiring point-of-use `toArr()` patches as a stopgap.
+### Supabase Tables
+
+#### `model_profiles`
+The core table. One row per model.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid/int | Primary key |
+| `full_name` | text | Used as the join key for inventory — do not change |
+| `username` | text | Login credential |
+| `pin` | text | 4-digit plaintext PIN |
+| `registered` | bool | True after signup form submitted |
+| `approved` | bool | Admin approval flag (shown on card) |
+| `profile_photo` | text | URL to profile photo in storage |
+| `photos` | text[] | Outfit inspo photo URLs |
+| `hair_photos` | text[] | Hair inspo photo URLs |
+| `mua_photos` | text[] | Makeup inspo photo URLs |
+| `face_photos` | text[] | Face close-up photo URLs |
+| `outfit_photos` | text[] | Own outfit photo URLs (also added to inventory) |
+| `assigned_stylist` | text | Staff name |
+| `assigned_hair` | text | Staff name |
+| `assigned_makeup` | text | Staff name |
+| `stylist_status` | text | 'working' / 'pending' / 'rejected' |
+| `hair_status` | text | Same |
+| `makeup_status` | text | Same |
+| `checklist_outfit` | bool | Admin completion checklist |
+| `checklist_hair` | bool | Admin completion checklist |
+| `checklist_makeup` | bool | Admin completion checklist |
+| `needs_hair` | bool | If false, hidden from hair team |
+| `needs_makeup` | bool | If false, hidden from makeup team |
+| `signup_manually_complete` | bool | Admin toggle: marks model as signed up even without face photo |
+| `signup_acknowledged` | bool | Admin dismissed model from the "completed" sign-up tracker section |
+| `updated_at` | timestamptz | **Auto-managed by Supabase moddatetime trigger. NEVER write this from client code.** |
+| `tags` | text[] | Admin-applied tags |
+| `notes` | text | Internal team notes (admin-only visible) |
+| `model_note` | text | Note from model to team (visible in panel) |
+| `hair_texture` | text | e.g. '4C' |
+| `hair_length` | text | 'Short' / 'Medium' / 'Long' |
+| `no_own_outfit` | bool | If true, auto-assigned to Daniel as stylist at signup |
+| `ethnicity` | text | Used for flag emoji display |
+| Various detail fields | | `age`, `gender`, `height`, `top_size`, `jean_size`, `suburb`, `style`, `phone`, `instagram`, `free_5july`, `hair_ok`, `makeup_self`, `cultural_piece`, `cultural_desc`, `talent`, `talent_desc`, `agency` |
+
+#### `users`
+Staff and admin accounts. Models are NOT in this table — they live entirely in `model_profiles`.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | Primary key |
+| `name` | text | Display name |
+| `role` | text | ADMIN / STYLIST / HAIR_STYLIST / MAKEUP_ARTIST |
+| `username` | text | Login credential |
+| `pin` | text | 4-digit plaintext PIN |
+| `instagram` | text | Shown on team cards in model dashboard |
+
+#### `inventory`
+Physical clothing and accessories for the show.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | Primary key |
+| `name` | text | Item name |
+| `category` | text | Top / Bottom / Outerwear / Accessory / Shoes / Full Look / Own Outfit |
+| `size_qty` | text | Free text size |
+| `assigned_model` | text | Full name string — matched against `model_profiles.full_name` |
+| `photo_url` | text | URL to item photo |
+
+**Critical:** Inventory-to-model assignment is by `full_name` string match, NOT by ID. If a model's name ever changes, their inventory assignments will silently break.
+
+### Supabase Storage
+- **Bucket:** `model-photos` (public)
+- **Path format:** `{folder}/{subfolder}/{timestamp}_{random5chars}` (no original filename — sanitized for security)
+- Old photos are **never deleted** from storage when updated. Only the DB URL pointer changes. Orphaned files accumulate harmlessly.
+
+### Deployment
+- **GitHub repo:** `visiondegarcon-blip/vdg-casting`, branch `portal-v2`
+- **Vercel:** Auto-deploys from `portal-v2` branch on every push
+- **Live URL:** `https://vdg-casting.vercel.app`
+- **Deploy process:** `git push origin portal-v2` — Vercel picks it up in ~30s
+- **No build step** — Vercel serves static files directly
 
 ---
 
-### Issue #2: Inventory item click did nothing — ✅ FIXED
-**Symptoms:** Clicking an inventory card produced no panel, no console error, and no "Item not found" toast (which would fire if `openInventoryPanel` ran but found no matching item).
+## 3. User Workflow
 
-**Root cause:** The deployed `app.js` on Vercel was an **outdated version that didn't match what was in the GitHub repo / local files** — it lacked the `onclick="openInventoryPanel('${item.id}')"` attribute entirely on the `.inv-card` divs in `renderInventoryGrid`. This was NOT a browser cache issue (a hard refresh did not fix it) — it was a stale Vercel deployment.
+### Model Sign-Up Flow
+1. Model goes to the app, clicks **Sign Up**
+2. Selects role: **Model / Applicant**
+3. Two paths:
+   - **Existing model** (was in a Google Form / pre-added by admin): selects their name from dropdown → form pre-fills → uploads face photo (required) + optional photos → sets username/PIN → submits
+   - **New model**: clicks "I'm a new model" toggle → fills full form from scratch
+4. On submit: `model_profiles` row is **updated** (existing) or **inserted** (new) with `registered: true, approved: true`
+5. Own outfit photos are **automatically added to `inventory`** as "Own Outfit" items assigned to that model
+6. Model then signs in and sees their profile dashboard
 
-**How diagnosed:**
-1. User inspected the live DOM — `.inv-card` elements had **no** `onclick` or `style="cursor:pointer"` attributes, even though the source `renderInventoryGrid` function clearly included them
-2. Hard refresh did not change this (ruled out simple browser cache)
-3. User loaded the live site's `/app.js` URL directly and searched for `openInventoryPanel` — **zero matches**, confirming the deployed file genuinely lacked this code
-4. User then checked the GitHub repo's file viewer directly — **the correct code WAS present there** (both the `onclick="openInventoryPanel(...)"` in `renderInventoryGrid` and the full `openInventoryPanel` function)
-5. Conclusion: GitHub had the right code, but Vercel's deployed build was stale/out of sync
+### Model Re-Registration
+A model can sign up again (e.g., if username didn't save). The existing model signup (`signUpExistingModel`) explicitly allows this — it only blocks if a *different* profile already has that username. The row is updated with the new username/PIN, overwriting old credentials. Tell a model with a failed signup: **"Sign up again, select your name from the dropdown, fill in the rest — your new username and PIN will overwrite the old ones."**
 
-**Exact fix applied:** User triggered a redeploy from the Vercel dashboard (Deployments → Redeploy on latest commit). After redeploy + hard refresh, inventory panel opened correctly.
+### Staff Sign-In Flow
+1. Staff signs up once (Sign Up → select role → select name → set username/PIN)
+2. After that, just Sign In with username + PIN
+3. Staff see a model grid filtered by relevance (hair team only sees `needs_hair: true` models)
+4. Staff click a model to open their detail panel → mark "Work With" / "Pending" / "Reject"
+5. "Work With" sets their assignment field (`assigned_hair`, etc.) to their name — visible to all staff on model cards
 
-**Files changed:** None (no code change needed — deployment/infra issue only)
+### Admin (Daniel) Flow
+1. Signs in as admin
+2. **Sign Up Tracker** appears at top of All Models tab:
+   - ✅ Completed — registered + face photo uploaded, OR manually toggled. Dismissable with ×.
+   - ⏳ Not Signed Up Yet — models with no face photo and not manually marked
+3. Clicks any tracker model → opens full model panel
+4. Panel header shows **signup toggle** (admin-only) — manually mark/unmark signed up
+5. Underneath tracker: full model grid with inline assignment dropdowns
+6. Admin can also access Inventory tab, Team tab, export CSV
 
-**Lessons learned:** When live behavior doesn't match source code AND a hard browser refresh doesn't fix it, **don't assume it's a browser cache problem** — check whether the deployment platform (Vercel) actually has the latest commit deployed. Compare the live served `/app.js` content directly (view raw file in browser) against the GitHub repo's file viewer to isolate "is this a deploy problem or a code problem."
-
----
-
-### Issue #3: Collapsible photo-section button text is invisible — ❌ UNRESOLVED
-See "Current Known Issues" section below for full details — this is the active bug to pick up next.
-
----
-
-## 4. DEBUGGING HISTORY (including dead ends)
-
-- **False lead — browser cache for inventory panel:** Initially assumed stale browser cache was why `.inv-card` elements lacked `onclick`. Hard refresh disproved this. The real cause was a stale Vercel deployment (see Issue #2).
-- **Confusion over which `app.js` is "live":** At one point there were at least 3 candidate versions in play — `app (1).js` (user's downloaded "current GitHub code"), `v2-fixed/app.js` (an earlier rewrite attempt that was confirmed via `diff` to have NEVER been pushed/deployed), and the actual deployed-but-stale Vercel build. This caused significant confusion until the user started checking the GitHub web file-viewer directly and comparing it against the live served `/app.js`.
-- **CSS variables ruled out for Issue #3:** Suspected `--brown-dark`/`--cream` CSS custom properties might be near-identical (causing low contrast). Checked `:root` block — `--brown-dark: #5c3d2e` (dark brown) vs `--cream: #f5f0e8` (near-white) — high contrast, NOT the cause. Ruled out.
-- **Duplicate `.collapse-btn` CSS rules ruled out:** Asked user to search `styles.css` for multiple definitions of `.collapse-btn`/`.collapse-section`/`.collapse-arrow` that might override each other. Full CSS file was read — only ONE definition of each exists (lines 454-479), and the rule itself looks completely correct (explicit `color: var(--brown-dark)` on `background: var(--cream)`).
-- **DOM inspection shows correct markup for Issue #3:** User inspected the element in DevTools — confirmed the button has `class="collapse-btn"`, the text node `"👤 Face Photos "` IS present as a child, and the `<span class="collapse-arrow">▾</span>` is there too. So this is NOT a missing-text/deploy-mismatch problem like Issue #2 was — the HTML is correct. This narrows it to a **rendering/computed-style issue**.
-
----
-
-## 5. DATABASE STATE
-
-**Tables (Supabase Postgres):**
-- `model_profiles` — columns include: `id`, `full_name`, `username`, `pin`, `registered` (bool), `approved` (bool), `instagram`, `phone`, `age`, `gender`, `ethnicity`, `height`, `top_size`, `jean_size`, `suburb`, `style`, `cultural_piece`, `cultural_desc`, `talent` (bool), `talent_desc`, `free_5july` (bool), `hair_ok` (bool), `makeup_self` (bool), `agency`, `model_note`, `notes`, `profile_photo` (text URL), array-type columns: `photos`, `hair_photos`, `mua_photos`, `outfit_photos`, `face_photos`, `tags`, plus `needs_hair`/`needs_makeup` (bool), `checklist_outfit`/`checklist_hair`/`checklist_makeup` (bool), `assigned_stylist`/`assigned_hair`/`assigned_makeup` (text — staff name), `stylist_status`/`hair_status`/`makeup_status` (text: 'working'/'pending'/'rejected')
-- `inventory` — columns: `id`, `name`, `category`, `size_qty`, `photo_url`, `assigned_model` (text — model's full_name), `created_at`
-- `users` — staff/admin accounts: `id`, `name`, `role` (STYLIST/HAIR_STYLIST/MAKEUP_ARTIST/ADMIN), `username`, `pin`
-
-**Known Supabase quirk (CRITICAL — affects all array columns):** Array-type columns (`photos`, `hair_photos`, `mua_photos`, `outfit_photos`, `face_photos`, `tags`) are SOMETIMES returned by Supabase as **JSON-encoded text strings** (e.g. `'["url1","url2"]'`) instead of actual JS/Postgres arrays. This is the root cause of Issue #1. Always run values through `toArr()`/`parseJsonArray()`/`normaliseModel()` before calling array methods on them.
-
-**Storage:** Bucket name is `model-photos`. Upload paths follow pattern `${folder}/${subfolder}/${timestamp}_${random}_${filename}` where `folder` = model's id/name (or `new_${Date.now()}` for brand-new signups) and `subfolder` ∈ `profile`, `face`, `fit`, `hair`, `mua`, `outfit`, or for inventory: `inventory/items`. Public URLs generated via `sb.storage.from('model-photos').getPublicUrl(path)`.
-
-**RLS policies / triggers / edge functions:** Not documented in this session — a previous session apparently fixed a Storage-policy bug related to photo uploads (mentioned as "resolved earlier photo-upload bug — Supabase Storage policies"), but the exact policy SQL was not captured here. **If uploads break again, check Storage bucket RLS policies on `model-photos` first.**
+### Model Dashboard (Post Login)
+After sign-in, model sees their profile: assigned team (with Instagram handles), notes from team, stage fit (inventory assigned to them), quick photo upload section, and all uploaded photos. Tap **Edit Details** to update any field or add photos.
 
 ---
 
-## 6. AUTHENTICATION FLOW
+## 4. Current State
 
-**No Supabase Auth is used** — this is a custom username/PIN system stored directly in `model_profiles` and `users` tables (plaintext PIN comparison — `model.pin !== pin`). This is insecure but is the existing design; not flagged as something to change.
+### Fully Working
+- Sign up (existing model and new model flows)
+- Sign in for all roles
+- Model profile dashboard + Edit Details panel
+- Admin model grid with assignment dropdowns on each card
+- Admin completion checklist (outfit / hair / makeup)
+- Staff model grid with role-based visibility filtering
+- Staff status system (Work With / Pending / Reject)
+- Model detail panel (all photo sections, details, notes, tags)
+- Sign-up tracker with manual admin toggle and dismiss
+- Inventory management (add, edit, delete, assign to model)
+- Stage fit section in panel (view + add from inventory)
+- Team panel (view staff and their models)
+- Manage Users (delete staff accounts)
+- Reset model PIN
+- Delete model (with storage cleanup attempt)
+- Export models CSV
+- Signup badge on all model cards (visible to all roles including staff)
+- "My Models" tab (Daniel-only — shows models assigned to him)
+- Back button (persistent nav for all logged-in users)
 
-**Sign-in (`signIn()`):**
-1. Checks `model_profiles` by `username` first — if found, validates `pin`, sets `currentUser = {id, name, role:'MODEL', username}`, calls `showModelDashboard(normaliseModel(model))`
-2. If no model found, checks `users` table — validates `pin`, sets `currentUser`, routes to `showAdminDashboard()` or `showStaffDashboard(user)` based on `role`
+### Known Limitations (Intentional for MVP)
+- No RLS on Supabase
+- PINs stored plaintext
+- No session persistence (must sign in again after closing browser)
+- Old profile photos accumulate in storage, never cleaned up
+- No photo deletion from model profiles (add-only)
+- Staff names hardcoded in `STAFF_NAMES` — adding new staff requires code change
+- Inventory-to-model link is full_name string, not ID
+- No pagination — loads all models at once (fine for ~50 models)
 
-**Sign-up (`signUp()`):** Branches by role:
-- `MODEL` + `isNewModel === true` → `signUpNewModel()` — creates a brand new `model_profiles` row via `.insert()`
-- `MODEL` + `isNewModel === false` → `signUpExistingModel()` — finds an existing pre-seeded (unregistered) row by `id` (selected from a dropdown of `registered=false` models) and `.update()`s it with username/pin/photos — **this OVERWRITES the row in place, does NOT create a duplicate**
-- Staff/Admin → simple insert into `users` table
-
-**User creation flow:** Models are pre-seeded into `model_profiles` (with `registered=false`, no username/pin) presumably by admin/CSV import before the event — the "Existing Model" signup flow is how these pre-seeded profiles get claimed by the actual person.
-
-**Known edge case discussed this session:** If a model needs to redo their signup (e.g., entered wrong info), they should simply **go through "Existing Model" signup again** — `signUpExistingModel`'s `.update().eq('id', nameVal)` will overwrite username/pin/photos on the same row, no duplicate created, no manual SQL deletion needed. (An alternative SQL-based reset was also provided to the user as a fallback option — see section 14 for the exact SQL if needed.)
+### Partially Implemented / Edge Cases
+- `signup_acknowledged` dismiss is permanent — no undo
+- Editing "no own outfit" in Edit Details doesn't auto-update `assigned_stylist` (auto-assign only happens at initial signup)
 
 ---
 
-## 7. STORAGE AND IMAGE HANDLING
+## 5. Historical Context — Bugs Solved
 
-**Upload architecture:** All uploads funnel through `uploadFiles(fileList, folder, subfolder, max)`:
-```js
-async function uploadFiles(fileList, folder, subfolder, max) {
-  const urls = [];
-  let files = Array.from(fileList);
-  if (max && files.length > max) files = files.slice(0, max);
-  for (const file of files) {
-    const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}_${file.name}`;
-    const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true });
-    if (!error) {
-      const { data } = sb.storage.from('model-photos').getPublicUrl(path);
-      urls.push(data.publicUrl);
-    } else { console.error('Upload error:', error); }
-  }
-  return urls;
-}
+### Bug 1: Assuming Auto-Deploy
+**What happened:** Claude said "Pushed ✅" after a `git commit` without running `git push`. The user had to manually deploy.
+
+**Lesson learned:** Always verify with `git log origin/branch --oneline` after committing. Never say "deployed" without confirming the push. `git commit` only saves locally. `git push origin portal-v2` is required for Vercel to pick it up.
+
+---
+
+### Bug 2: Schema Cache Error on Toggle Untick
+**Error:** `Could not find the 'updated_at' column of 'model_profiles' in the schema cache`
+
+**What happened:** The `toggleSignupComplete` function was sending `updated_at: now` in the Supabase `.update()` call alongside `signup_manually_complete`.
+
+**Root cause:** `updated_at` is managed by a **Supabase `moddatetime` trigger**. It is effectively read-only from the client. Supabase's PostgREST schema cache rejects explicit writes to trigger-managed columns.
+
+**Fix:** Removed `updated_at` from the update payload. Only `signup_manually_complete` is written.
+
+**Architectural rule going forward:** NEVER include `updated_at` in any `.update()` call. The moddatetime trigger fires automatically whenever any other column changes. The "Last updated" display in the admin panel reflects **model self-edits only** — admin toggle actions must not change the timestamp.
+
+---
+
+### Bug 3: Redundant Mini Popup
+**What happened:** Original sign-up tracker had a mini popup on click (showing last updated + "Mark as Complete" button). This required two clicks to see a full profile and duplicated functionality.
+
+**Fix:** Removed mini popup entirely (`openTrackerDetail` and `closeTrackerDetail` functions deleted). Tracker clicks now go directly to `openModelPanel`. The signup toggle was moved into the panel header, where it's permanently visible for admin on any model panel.
+
+---
+
+### Bug 4: MIME Validation Silent Failures
+**What happened:** Added `file.type.startsWith('image/')` check in `uploadFiles()`. Removed because `file.type` can be empty string on some systems/browsers (especially drag-and-drop), causing files to be silently skipped with no user feedback.
+
+**Lesson:** Silent failures are worse than no validation for an internal MVP. The browser's `accept="image/*"` on all file inputs already provides sufficient protection. If MIME validation is ever re-added, it MUST show a visible toast error to the user.
+
+---
+
+## 6. Active Investigations
+
+**None at time of writing.** App is MVP-complete and deployed.
+
+**Known issue to watch:** Jasmine's account — her username didn't save on first signup attempt. Recommended resolution: have her sign up again using the existing model dropdown. The re-registration path overwrites credentials cleanly.
+
+---
+
+## 7. Important Decisions
+
+### No Framework
+Deliberate. Single-event app with tight timeline. Vanilla JS is faster to iterate for this scope. Do not introduce React/Vue/etc.
+
+### Three Files Only
+`index.html` / `app.js` / `styles.css`. One file per concern. Don't split unless the app grows significantly beyond this event.
+
+### Admin Toggle Does Not Update `updated_at`
+Deliberate. The "Last updated" timestamp is a signal of **model self-activity**, not admin activity. Admin marking a toggle, editing notes, or changing assignments should not affect it.
+
+### Staff Names Hardcoded
+`STAFF_NAMES` constant in app.js is the canonical source for role dropdowns. This ensures Daniel (ADMIN) always appears as a STYLIST option even though his DB role is ADMIN. The `staffUsers` from the DB is a fallback only.
+
+### Inventory by Full Name
+`inventory.assigned_model` is a name string for simplicity. Acceptable for a fixed-roster single event. If the app runs again, migrate to a foreign key.
+
+### Own Outfit → Auto Inventory
+Outfit photos uploaded at signup or via Edit Details are automatically inserted as `inventory` rows. This gives stylists visibility into what models are bringing without manual entry.
+
+### No Photo Deletion
+Add-only for model photos. Keeps things simple and prevents accidental loss. Admin can delete the whole model profile if needed.
+
+---
+
+## 8. Known Risks
+
+### 🔴 High: No RLS on Supabase
+Anyone with the anon key (visible in app.js source) can read or write all tables. Acceptable for a trusted internal event. Enable RLS before using beyond this event.
+
+### 🟡 Medium: Inventory by Full Name
+Renaming a model in `model_profiles.full_name` silently breaks all their inventory assignments. Never rename models without also updating `inventory.assigned_model`.
+
+### 🟡 Medium: Cache Version Must Be Bumped
+`index.html` loads `app.js?v=7`. If you forget to increment on deploy, browsers serve stale JS. Always bump the version number.
+
+### 🟡 Medium: `window._panelModelId` Global
+The signup toggle uses `window._panelModelId` (set in `openModelPanel`). Fine for single-panel use, but would collide if the UI ever allowed multiple panels open simultaneously.
+
+### 🟢 Low: 80ms Timeout in Staff Panel
+`closePanel();setTimeout(()=>openModelPanel(...),80)` — animation timing hack. Fragile if CSS transitions change duration.
+
+### 🟢 Low: `toArr()` Must Be Used for Photo Arrays
+Supabase sometimes returns array columns as JSON strings. Always use `toArr(m.photos)` etc., never access photo arrays directly. Missing `toArr()` in new code will cause `.map is not a function` errors.
+
+### 🟢 Low: Plaintext PINs
+PINs stored as plain text in both tables. Fine for this event scope; hash them if ever reused.
+
+---
+
+## 9. Recommended Next Steps
+
+### Before Event Day (July 5)
+1. **Enable Supabase RLS** — Add policies: models can only read/write their own row; staff can read all, write limited fields; admin full access.
+2. **Verify Jasmine's account** — Check `model_profiles` for her name with no username. If found, have her re-register.
+3. **Mobile testing** — Test sign-up, photo upload, panel scroll, and toggle on iOS Safari + Android Chrome.
+
+### Soon After
+4. **PIN hashing** — Hash before storing (bcrypt or Supabase Auth).
+5. **Photo deletion** — Let admin remove individual photos from a model profile.
+6. **Staff name management** — Move `STAFF_NAMES` to DB or make it editable from admin panel.
+
+### Future / Nice to Have
+7. **Session persistence** — Store `currentUser` in localStorage.
+8. **Undo dismiss** — Currently `signup_acknowledged` is permanent with no undo.
+9. **Storage cleanup** — Delete orphaned photos from Supabase Storage when model is deleted or photo replaced.
+10. **Inventory FK** — Migrate `inventory.assigned_model` from name string to UUID foreign key.
+11. **Pagination** — If roster exceeds ~100 models, lazy-load instead of fetching all at once.
+
+---
+
+## Quick Reference
+
 ```
-Returns an array of public URLs which then get stored directly in the relevant `model_profiles` array columns or `inventory.photo_url`.
-
-**Thumbnail handling:** None — original images are displayed at full resolution via `object-fit: cover` in fixed-aspect-ratio containers (`.photo-thumb { aspect-ratio: 3/4; }`, `.stage-fit-item img { aspect-ratio: 3/4; }`, `.inv-card-photo { aspect-ratio: 3/4; }`).
-
-**Previous image-related bugs:** A Storage RLS-policy bug previously prevented uploads from succeeding (fixed in an earlier session, exact policy not documented here). The `arr.map is not a function` crash (Issue #1) was technically about *displaying* already-uploaded photo arrays, not about the upload process itself.
-
----
-
-## 8. FRONTEND ARCHITECTURE
-
-- **No components/framework** — everything is template-literal strings injected via `.innerHTML`
-- **Global mutable state variables** at top of `app.js`: `currentUser`, `allModels`, `inventoryData`, `activeTab`, `staffTab`, `openModelData`, `isNewModel`
-- **"Routing"** is just `hideAll()` + `classList.remove('hidden')` on the relevant `.dashboard` div — no URL-based routing, no history API
-- **Data fetching pattern:** `loadAllModels()` and `loadInventory()` populate the global `allModels`/`inventoryData` arrays; most render functions just read from these cached arrays rather than re-fetching; mutations (`assignField`, `toggleChecklist`, etc.) update both Supabase AND the local cached array, then call `refreshCurrentView()` to re-render
-- **Modals/panels** are overlay divs toggled via `.hidden` class: `#model-panel-overlay`, `#inv-modal-overlay` — both use the pattern `classList.remove('hidden')` to show, `classList.add('hidden')` to hide, plus `document.body.style.overflow='hidden'` to lock page scroll while open
+Live URL:        https://vdg-casting.vercel.app
+GitHub:          visiondegarcon-blip/vdg-casting  (branch: portal-v2)
+Deploy command:  git push origin portal-v2
+Cache version:   Currently v=7 in index.html <script src="app.js?v=7">
+                 Increment this on every deploy.
+Admin login:     username: danielngabz  (ask Daniel for PIN)
+Supabase URL:    https://dyruvkzuasaiofkxdvid.supabase.co
+Supabase key:    sb_publishable_tKMXDxTa-uICYsBE3OUh7A_RsoGFhhf
+```
 
 ---
 
-## 9. BACKEND ARCHITECTURE
-
-There is no custom backend — **Supabase IS the backend**, accessed directly from the browser via the JS client with a publishable key. All "API calls" are direct `sb.from('table').select/insert/update()` calls or `sb.storage.from('bucket').upload/getPublicUrl()`. No serverless functions, no Edge Functions, no custom REST/GraphQL layer were found or mentioned.
-
----
-
-## 10. CURRENT KNOWN ISSUES
-
-### Issue #3 (ACTIVE): Collapsible section button text invisible — UNRESOLVED
-**Symptoms:** In the model detail panel (opened via `openModelPanel`), the three collapsible buttons that should read "👤 Face Photos ▾", "👕 Outfit ▾", "💇 Hair & Makeup Inspo ▾" instead render as blank horizontal bars with no visible text — see user's screenshot showing 3 long empty-looking lines stacked above the "Note From Model" section.
-
-**Suspected cause:** Unknown — narrowed down significantly but not resolved. Likely a CSS computed-style issue (something is making the text color match the background, or font-size/line-height is collapsing the text to invisibility) OR a rendering quirk specific to the user's browser.
-
-**Evidence gathered (and ruled out):**
-- ✅ DOM inspection confirms the button HTML is structurally correct: `<button class="collapse-btn" onclick="toggleCollapse(this)">👤 Face Photos <span class="collapse-arrow">▾</span></button>` — text node `"👤 Face Photos "` IS present as a child of the button
-- ✅ CSS rule for `.collapse-btn` (styles.css lines 454-471) looks completely correct: explicit `color: var(--brown-dark)` (#5c3d2e, dark brown) on `background: var(--cream)` (#f5f0e8, near-white) — should have strong contrast
-- ✅ No duplicate/conflicting `.collapse-btn`/`.collapse-section`/`.collapse-arrow` rules exist anywhere else in `styles.css` (full file read and searched)
-- ✅ CSS custom properties `--brown-dark` and `--cream` are correctly defined in `:root` with the expected high-contrast values — not the issue
-- ❓ NOT YET CHECKED: the actual **computed** `color` value in DevTools "Computed" tab for the button (vs. the rule that's *supposed* to apply) — this is the critical missing data point
-- ❓ NOT YET CHECKED: whether `font-size`/`line-height`/`overflow` computed values are collapsing the text box to zero height/width
-- ❓ NOT YET CHECKED: whether this is a deployed-code mismatch like Issue #2 (i.e., is the LIVE served `styles.css` actually identical to the one read in this session?)
-
-**Confidence level:** LOW-MEDIUM — we've ruled out the most likely CSS-authoring mistakes, but haven't yet looked at DevTools' **Computed** styles tab (only the Elements/DOM tree), which is the next logical step.
-
-**Recommended next debugging steps (in order):**
-1. **Check for a deploy/cache mismatch first** (cheapest check, and burned us once already on Issue #2): have the user load the live site's `/styles.css` URL directly and search for `.collapse-btn` — confirm the served CSS matches what was read in this session (the version with `color: var(--brown-dark)` etc. at lines 454-471)
-2. **Inspect computed styles**: in DevTools, click the `<button class="collapse-btn">` element, switch to the **"Computed"** tab (not "Styles"), and look up the actual resolved values for `color`, `background-color`, `font-size`, `line-height`, `height`, `overflow`. Compare the resolved `color` against what `.collapse-btn` *should* produce (`#5c3d2e`)
-3. If computed `color` is correct but text still invisible — check `overflow`/`height`/`line-height` for clipping
-4. If computed `color` is WRONG (e.g., resolves to white/transparent/same-as-background) — there's a higher-specificity or later-cascade rule overriding it that wasn't found in the static file read; consider it might be coming from a **browser extension**, **dark-mode forced styles**, or an **inline style** injected by JS that wasn't visible in the static `app.js` read
-5. Try **incognito/private window** to rule out browser extensions injecting CSS overrides
-
----
-
-## 11. IMPORTANT FILES
-
-- **`/Users/admin/Desktop/app vdg files/app (1).js`** — the main (and only) JS file; ~1109 lines; contains ALL app logic. This is the version confirmed to match what's now correctly deployed (after the redeploy that fixed Issue #2). **This is the canonical reference file going forward.**
-- **`/Users/admin/Desktop/app vdg files/styles (1).css`** — the main (and only) CSS file; ~483 lines; read in full this session, no issues found in static analysis
-- **`/Users/admin/Desktop/app vdg files/index (1).html`** — main HTML shell (not re-read this session, but confirmed byte-identical to other copies in earlier sessions via `diff`)
-- **`/Users/admin/Desktop/app vdg files/v2-fixed/`** — ⚠️ a STALE/ABANDONED rewrite folder from an earlier session; confirmed via `diff` to NOT be what's deployed; **do not use as reference, will cause confusion** (kept causing version-mismatch confusion this session — consider deleting it)
-- **GitHub repo** (connected to Vercel) — the actual source of truth for what gets deployed; user can view files directly via GitHub's web file viewer — **this is more reliable than comparing local downloaded copies**, since local copies can be stale/renamed (`app (1).js` vs `app.js` vs `v2-fixed/app.js`)
-
----
-
-## 12. OPEN TASKS
-
-**Critical:**
-- Fix Issue #3: invisible collapse-btn text in model detail panel (see Section 10 for exact next steps)
-
-**High:**
-- (b) Redesign model's own dashboard (`showModelDashboard` / `#model-profile-wrap`) into a centered, rounded-corner, internally-scrollable modal/panel (matching the visual pattern already used for `model-panel-overlay`/`.model-panel`), and surface `assigned_stylist`/`assigned_hair`/`assigned_makeup` prominently at the top (the `model-team-cards` section already exists in the code at line ~1017-1025 but only shows if at least one assignment exists — may need to always show "Your Team" with placeholder text for unassigned roles, per user's request to always show "who's assigned to them")
-
-**Medium:**
-- (a) Change "Your Own Outfit Photos" signup wording → something themed around "current outfits that fit the streetwear/traditional theme" + auto-upload to `inventory` table + auto-`assigned_model` to that model (touches `signUpNewModel`/`signUpExistingModel` upload logic and possibly a new helper to insert into `inventory`)
-- (c) Add explanatory captions for "Final Stage Fits"/"Assigned Inventory" sections (small UI text addition in `openModelPanel`'s `invHTML` block, line ~650, and/or `showModelDashboard`'s `modelInv` block, line ~1027) — e.g. "Final Stage Fits = wardrobe items from inventory assigned to this model for the shoot"
-
-**Low:**
-- Consolidate duplicate `toArr()`/`parseJsonArray()` helpers into one (currently both exist and do the same thing)
-- Consider deleting the stale `v2-fixed/` folder to prevent future version-confusion
-- Line 986 in `showModelDashboard`: `const photos = model.photos || [];` is NOT wrapped in `toArr()` like its siblings — works currently because `normaliseModel()` is called upstream, but inconsistent and fragile; should be `toArr(model.photos)` for consistency/safety
-
----
-
-## 13. NEXT SESSION STARTING POINT
-
-The user is actively in a live debugging session and will likely return with DevTools "Computed" tab screenshots for the `.collapse-btn` element (Issue #3 — see Section 10, step 2 for exactly what to ask for if they haven't provided it yet). 
-
-Start by:
-1. Asking for (or reviewing) the Computed-tab color/font values for `.collapse-btn`
-2. Also ask them to check the live `/styles.css` URL for `.collapse-btn` to rule out a deploy mismatch (we got burned by this exact pattern on Issue #2 — don't skip this check)
-3. Once Issue #3 is resolved, the user explicitly said the next priorities are (b) the model-dashboard redesign, then (a) the signup wording/auto-upload change, then (c) captions
-
-The user prefers very explicit "find this exact text, replace with this exact text, here's the line number" instructions — they've said multiple times they get confused by vague descriptions of where to make changes. Always quote exact strings to search for and exact replacement code blocks.
-
----
-
-## 14. DO NOT REPEAT
-
-- **Do NOT assume browser cache is the problem when live behavior ≠ source code.** A hard refresh does not bypass a stale Vercel deployment. Always check: (1) does the live served file (`/app.js`, `/styles.css` loaded directly via URL) actually contain the expected code, and (2) does the GitHub repo (source of truth for Vercel) have the correct code. If GitHub has it but the live site doesn't, the fix is to **redeploy on Vercel**, not to clear browser cache.
-- **Do NOT reference `/v2-fixed/app.js` as a current source of truth** — it's a confirmed-abandoned rewrite from an earlier session that was never pushed/deployed. It only causes confusion when comparing line numbers/code against what the user actually has live.
-- **Do NOT assume CSS custom property (`--variable`) values are wrong without checking `:root`.** We initially suspected `--brown-dark`/`--cream` might be too similar — they're not (`#5c3d2e` vs `#f5f0e8`, high contrast). Checked and ruled out.
-- **Do NOT assume there are duplicate/conflicting CSS rules without actually searching the full file.** Searched `styles.css` fully for `.collapse-btn`/`.collapse-section`/`.collapse-arrow` — only one definition of each exists.
-- **Do NOT tell the user to "leave it alone" regarding `model.photos || []` vs `toArr(model.photos)` ambiguity** — be explicit that `toArr()` should be used everywhere arrays from Supabase are consumed, for consistency, even if the current code happens to work without it in a specific spot due to upstream normalization.
-- **When giving code-edit instructions to this user, always provide exact "find X / replace with Y" blocks with line numbers** — they've explicitly said vague descriptions confuse them and they will ask for clarification, costing a round-trip.
-
----
-
-## 15. EXECUTIVE SUMMARY
-
-This is a vanilla-JS + Supabase event-management app for a fashion show ("5 July") with no framework, deployed via GitHub→Vercel. This session fixed two major bugs: (1) the model detail panel wouldn't open due to Supabase returning array columns as JSON-text strings, crashing `.map()` calls — fixed by wrapping all array-field reads in a `toArr()` normalization helper across `openModelPanel` and `showModelDashboard`; and (2) inventory item clicks did nothing because Vercel was serving a stale build that didn't match the (correct) code in GitHub — fixed by triggering a manual redeploy. 
-
-One bug remains unresolved: the collapsible photo-section buttons ("Face Photos"/"Outfit"/"Hair & Makeup Inspo") in the model detail panel render as blank bars — the DOM/HTML is confirmed correct (text node present, classes correct) and the CSS rule for `.collapse-btn` looks correct on static read (dark-brown text on cream background, no duplicates, correct CSS variables) — meaning the next step MUST be checking the DevTools **Computed** styles tab (not just Elements/DOM) to see what color/size is actually being resolved at runtime, and cross-checking whether the live-served `styles.css` matches the local copy (in case this is yet another stale-deployment issue like #2).
-
-After Issue #3 is fixed, three deferred feature requests remain, in the user's stated priority order: (b) redesign the model's own dashboard into a centered/rounded/scrollable modal showing assigned staff, (a) change signup wording for "outfit photos" + auto-upload-to-inventory + auto-assign, and (c) add clarifying captions about what "Final Stage Fits"/"Assigned Inventory" means for staff viewers.
-
-The user strongly prefers extremely explicit, copy-paste-ready instructions with exact line numbers and find/replace text blocks — vague guidance leads to confusion and wasted round-trips.
+*Last updated: June 2026. App status: MVP complete, deployed, in active use pre-event.*
