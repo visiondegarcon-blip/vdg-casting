@@ -471,28 +471,49 @@ function renderAdminModels(search) {
 function renderSignedUpPanel() {
   const panel = document.getElementById('signed-up-panel');
   if (!panel) return;
-  const newSignups = allModels.filter(m => m.approved && !m.signup_acknowledged);
-  if (!newSignups.length) { panel.innerHTML = ''; return; }
+
+  // "Completed" = went through signup form AND uploaded a face photo (confirms post-fix signup)
+  const completed = allModels.filter(m => m.registered && toArr(m.face_photos).length > 0 && !m.signup_acknowledged);
+  // "Not yet" = never registered OR registered but no face photo (old/incomplete signup)
+  const notYet    = allModels.filter(m => !m.registered || toArr(m.face_photos).length === 0);
+
+  if (!completed.length && !notYet.length) { panel.innerHTML = ''; return; }
+
+  const makeCard = (m, dismissable) => {
+    const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const avatar   = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
+    const xBtn     = dismissable ? `<button class="signed-up-dismiss" onclick="event.stopPropagation();dismissSignup('${m.id}')" title="Dismiss">×</button>` : '';
+    return `<div class="signed-up-card" onclick="openModelPanel('${m.id}')">
+      ${xBtn}
+      <div class="signed-up-avatar">${avatar}</div>
+      <div class="signed-up-name">${(m.full_name||'—').split(' ')[0]}</div>
+    </div>`;
+  };
+
+  const completedHTML = completed.length ? `
+    <div style="margin-bottom:20px">
+      <div class="panel-section-title" style="margin-bottom:10px">✅ Completed Sign Up <span style="font-weight:400;color:var(--dim);font-size:10px">${completed.length}</span></div>
+      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">Submitted the form and uploaded a face photo — tap × to dismiss once you've reviewed their profile.</p>
+      <div class="signed-up-grid">${completed.map(m => makeCard(m, true)).join('')}</div>
+    </div>` : '';
+
+  const notYetHTML = notYet.length ? `
+    <div>
+      <div class="panel-section-title" style="margin-bottom:10px">⏳ Not Signed Up Yet <span style="font-weight:400;color:var(--dim);font-size:10px">${notYet.length}</span></div>
+      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">Haven't completed sign up or missing face photo — reach out to these models to finish.</p>
+      <div class="signed-up-grid">${notYet.map(m => makeCard(m, false)).join('')}</div>
+    </div>` : '';
+
   panel.innerHTML = `
     <div class="collapse-section open" style="margin-bottom:24px">
       <button class="collapse-btn" onclick="toggleCollapse(this)">
-        ✅ Signed Up
-        <span style="font-size:10px;font-family:var(--font-mono);opacity:.7;margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0">${newSignups.length} new</span>
+        📋 Sign Up Tracker
+        <span style="font-size:10px;font-family:var(--font-mono);opacity:.7;margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0">${completed.length} done · ${notYet.length} pending</span>
         <span class="collapse-arrow">▾</span>
       </button>
       <div class="collapse-body">
-        <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 14px">Models who just completed sign up — tap × to dismiss once you've checked their profile.</p>
-        <div class="signed-up-grid">
-          ${newSignups.map(m => {
-            const initials = (m.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-            const avatar = m.profile_photo ? `<img src="${m.profile_photo}" alt=""/>` : initials;
-            return `<div class="signed-up-card" onclick="openModelPanel('${m.id}')">
-              <button class="signed-up-dismiss" onclick="event.stopPropagation();dismissSignup('${m.id}')" title="Dismiss">×</button>
-              <div class="signed-up-avatar">${avatar}</div>
-              <div class="signed-up-name">${(m.full_name||'—').split(' ')[0]}</div>
-            </div>`;
-          }).join('')}
-        </div>
+        ${completedHTML}
+        ${notYetHTML}
       </div>
     </div>`;
 }
@@ -533,7 +554,7 @@ function modelCardHTML(m, viewerRole) {
   const genderBadge = m.gender ? `<span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender}</span>` : '';
   const igBadge     = m.instagram ? `<span class="badge badge-outline">@${m.instagram}</span>` : '';
   const ethBadge    = m.ethnicity ? `<span class="badge badge-outline">${flag} ${m.ethnicity}</span>` : '';
-  const signupBadge = !isAdmin ? (m.approved
+  const signupBadge = !isAdmin ? (m.registered && toArr(m.face_photos).length > 0
     ? `<span class="badge badge-green">✓ Signed Up</span>`
     : `<span class="badge badge-outline">Not Signed Up</span>`) : '';
 
@@ -844,6 +865,7 @@ async function openModelPanel(id) {
 
   document.getElementById('panel-body').innerHTML = body;
   document.getElementById('model-panel-overlay').classList.remove('hidden');
+  document.getElementById('panel-back-btn')?.classList.remove('hidden');
   document.body.style.overflow='hidden';
 }
 
@@ -855,6 +877,7 @@ function toggleCollapse(btn) {
 
 function closePanel() {
   document.getElementById('model-panel-overlay').classList.add('hidden');
+  document.getElementById('panel-back-btn')?.classList.add('hidden');
   document.body.style.overflow='';
   openModelData=null;
 }
@@ -1227,6 +1250,40 @@ function renderTeam() {
     const assigned=allModels.filter(m=>m[s.field]===s.name);
     return `<div class="team-card"><div class="team-card-name">${s.name}</div><div class="team-card-role">${s.role} · ${assigned.length} assigned</div><div class="team-assigned-list">${assigned.length?assigned.map(m=>`<div class="team-assigned-item">${getFlag(m.ethnicity)} ${m.full_name}</div>`).join(''):'<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">None assigned</div>'}</div></div>`;
   }).join('');
+  renderManageUsers();
+}
+
+async function renderManageUsers() {
+  const section = document.getElementById('manage-users-section');
+  if (!section) return;
+  const { data: allUsers } = await sb.from('users').select('id,name,role,username').order('name');
+  if (!allUsers || !allUsers.length) {
+    section.innerHTML = `<div class="panel-section-title" style="margin-bottom:12px">Manage Users</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">No users found.</div>`;
+    return;
+  }
+  const RL = { ADMIN:'Admin', STYLIST:'Stylist', HAIR_STYLIST:'Hair Stylist', MAKEUP_ARTIST:'Makeup Artist' };
+  section.innerHTML = `
+    <div class="panel-section-title" style="margin-bottom:8px">Manage Users</div>
+    <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:16px">Delete test accounts or old users. Cannot be undone.</p>
+    <div class="manage-users-list">
+      ${allUsers.map(u=>`
+        <div class="manage-user-row">
+          <div>
+            <div class="manage-user-name">${u.name||'—'}</div>
+            <div class="manage-user-meta">${RL[u.role]||u.role}${u.username?' · @'+u.username:' · no username'}</div>
+          </div>
+          <button class="btn btn-sm" style="background:none;border:1.5px solid var(--red);color:var(--red);flex-shrink:0" onclick="deleteUser('${u.id}','${(u.name||'').replace(/'/g,"\\'")}')">Delete</button>
+        </div>`).join('')}
+    </div>`;
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete ${name||'this user'}? This cannot be undone.`)) return;
+  const { error } = await sb.from('users').delete().eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  toast(`${(name||'User').split(' ')[0]} deleted`);
+  await loadStaffUsers();
+  renderTeam();
 }
 
 // ═══════════════════════════════════════════════
