@@ -613,6 +613,7 @@ window.openTrackerDetail = function openTrackerDetail(id) {
 
   const signedUpStatus = m.registered ? '✅ Registered' : '⏳ Not registered';
   const hasFace = toArr(m.face_photos).length > 0;
+  const isComplete = m.signup_manually_complete;
 
   const overlay = document.createElement('div');
   overlay.className = 'tracker-detail-overlay';
@@ -622,9 +623,16 @@ window.openTrackerDetail = function openTrackerDetail(id) {
       <button class="tracker-detail-close" onclick="closeTrackerDetail()">×</button>
       <div class="tracker-detail-header">
         <div class="tracker-detail-avatar">${avatar}</div>
-        <div>
+        <div style="flex: 1;">
           <div style="font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--text)">${m.full_name||'—'}</div>
           <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Last updated: ${lastUpdated}</div>
+        </div>
+        <div class="tracker-detail-header-switch">
+          <label class="toggle-switch">
+            <input type="checkbox" ${isComplete ? 'checked' : ''} onchange="toggleSignupComplete('${m.id}', this)"/>
+            <span class="toggle-slider"></span>
+          </label>
+          <span class="toggle-label">${isComplete ? 'Complete' : 'Pending'}</span>
         </div>
       </div>
       <div class="tracker-detail-body">
@@ -646,9 +654,6 @@ window.openTrackerDetail = function openTrackerDetail(id) {
         </div>
       </div>
       <div class="tracker-detail-footer">
-        <button class="tracker-complete-btn" onclick="markSignupComplete('${m.id}')">
-          ✅ Mark as Sign Up Complete
-        </button>
         <button class="tracker-view-btn" onclick="closeTrackerDetail();openModelPanel('${m.id}')">
           View Full Profile →
         </button>
@@ -663,16 +668,21 @@ window.closeTrackerDetail = function closeTrackerDetail() {
   if (el) el.remove();
 }
 
-window.markSignupComplete = async function markSignupComplete(id) {
-  const btn = document.querySelector('.tracker-complete-btn');
-  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
-  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: true }).eq('id', id);
-  if (error) { toast(error.message, true); if (btn) { btn.textContent = '✅ Mark as Sign Up Complete'; btn.disabled = false; } return; }
+window.toggleSignupComplete = async function toggleSignupComplete(id, checkbox) {
+  const newState = checkbox.checked;
+  checkbox.disabled = true;
+  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: newState }).eq('id', id);
+  if (error) {
+    toast(error.message, true);
+    checkbox.checked = !newState;
+    checkbox.disabled = false;
+    return;
+  }
   const m = allModels.find(x => String(x.id) === String(id));
-  if (m) m.signup_manually_complete = true;
-  closeTrackerDetail();
+  if (m) m.signup_manually_complete = newState;
+  checkbox.disabled = false;
   renderSignedUpPanel();
-  toast('Marked as sign up complete ✓');
+  toast(newState ? 'Marked as complete ✓' : 'Marked as pending ✓');
 }
 
 // Daniel's "My Models" — only renders when currentUser is Daniel, shows no_own_outfit models

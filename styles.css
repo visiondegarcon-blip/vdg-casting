@@ -701,10 +701,15 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 .tracker-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .tracker-detail-label { font-size: 11px; font-family: var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0; }
 .tracker-detail-value { font-size: 12px; font-weight: 600; color: var(--text); text-align: right; }
+.tracker-detail-header-switch { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.toggle-label { font-size: 11px; font-family: var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+.toggle-switch { display: flex; align-items: center; position: relative; cursor: pointer; height: 22px; }
+.toggle-switch input { display: none; }
+.toggle-slider { position: absolute; top: 2px; left: 0; width: 34px; height: 18px; background: #d1d5db; border-radius: 9px; transition: background .2s; }
+.toggle-switch input:checked + .toggle-slider { background: #1a6640; }
+.toggle-slider::before { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: left .2s; }
+.toggle-switch input:checked + .toggle-slider::before { left: 18px; }
 .tracker-detail-footer { padding: 14px 22px 20px; display: flex; flex-direction: column; gap: 8px; border-top: 1.5px solid var(--border); }
-.tracker-complete-btn { width: 100%; padding: 11px; background: #1a6640; border: none; border-radius: var(--radius-sm); color: #fff; font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: .04em; cursor: pointer; transition: background .15s; }
-.tracker-complete-btn:hover { background: #155234; }
-.tracker-complete-btn:disabled { opacity: .6; cursor: not-allowed; }
 .tracker-view-btn { width: 100%; padding: 10px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: .04em; cursor: pointer; transition: all .15s; }
 .tracker-view-btn:hover { border-color: var(--brown-light); background: var(--cream); }
 
