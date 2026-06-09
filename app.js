@@ -545,7 +545,7 @@ function renderDanielPanel() {
   if (!panel) return;
   if (currentUser?.name !== 'Daniel') { panel.innerHTML = ''; return; }
 
-  const myModels = allModels.filter(m => m.no_own_outfit);
+  const myModels = allModels.filter(m => m.assigned_stylist === 'Daniel');
   if (!myModels.length) { panel.innerHTML = ''; return; }
 
   const makeCard = (m) => {
@@ -565,7 +565,7 @@ function renderDanielPanel() {
         <span class="collapse-arrow">▾</span>
       </button>
       <div class="collapse-body">
-        <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">These models ticked "no foundation outfits" — auto-assigned to you as stylist.</p>
+        <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:0 0 12px">Models assigned to you as stylist — either auto-assigned (no foundation fits) or manually assigned from the grid below.</p>
         <div class="signed-up-grid">${myModels.map(m => makeCard(m)).join('')}</div>
       </div>
     </div>`;
