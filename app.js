@@ -757,18 +757,20 @@ function modelCardHTML(m, viewerRole) {
   const flag     = getFlag(m.ethnicity);
   const isAdmin  = viewerRole === 'ADMIN';
 
-  // Status pill for staff views
-  let statusPill = '';
-  if (!isAdmin) {
+  // Assignment tags — only show the tag relevant to the viewer's own role
+  // (so stylists see stylist assignments, hair sees hair, etc.)
+  // Admin sees all three.
+  let assignedTags = '';
+  if (isAdmin) {
+    assignedTags = [m.assigned_stylist, m.assigned_hair, m.assigned_makeup]
+      .filter((v,i,a) => v && a.indexOf(v) === i)
+      .map(name => `<span class="badge badge-brown">Assigned to ${name}</span>`).join('');
+  } else {
     const rf = ROLE_FIELDS[viewerRole];
-    const taken = m[rf.assign];
-    if (taken) statusPill = `<span class="badge badge-brown">Taken by ${taken}</span>`;
+    if (rf && m[rf.assign]) {
+      assignedTags = `<span class="badge badge-brown">Assigned to ${m[rf.assign]}</span>`;
+    }
   }
-
-  // Assignment tags — shown so staff can see at a glance who's already on a model
-  const assignedTags = [m.assigned_stylist, m.assigned_hair, m.assigned_makeup]
-    .filter((v,i,a)=>v && a.indexOf(v)===i)
-    .map(name=>`<span class="badge badge-brown">Assigned to ${name}</span>`).join('');
 
   const genderBadge = m.gender ? `<span class="badge ${m.gender==='Male'?'badge-blue':'badge-pink'}">${m.gender}</span>` : '';
   const igBadge     = m.instagram ? `<span class="badge badge-outline">@${m.instagram}</span>` : '';
@@ -816,7 +818,6 @@ function modelCardHTML(m, viewerRole) {
         ${igBadge}
         ${ethBadge}
         ${assignedTags}
-        ${statusPill}
         ${signupBadge}
       </div>
       <div class="card-details">
@@ -1104,10 +1105,30 @@ async function openModelPanel(id) {
       <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Permanently removes this model's profile and all uploaded photos. Cannot be undone.</div>
     </div>` : '';
 
+  // ── Read-only team block for staff — who else is on this model ──
+  let staffTeamBlock = '';
+  if (role && role !== 'ADMIN') {
+    const teamPairs = [
+      { label: 'Stylist',    val: m.assigned_stylist },
+      { label: 'Hair',       val: m.assigned_hair    },
+      { label: 'Makeup',     val: m.assigned_makeup  },
+    ].filter(p => p.val); // only show filled roles
+    if (teamPairs.length) {
+      staffTeamBlock = `
+        <div>
+          <div class="panel-section-title">Team on this model</div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">
+            ${teamPairs.map(p => `<div style="font-size:12px;font-family:var(--font-mono);background:var(--cream);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px"><span style="color:var(--dim)">${p.label}:</span> ${p.val}</div>`).join('')}
+          </div>
+        </div>`;
+    }
+  }
+
   // ── ORDER per role — photo buttons ALWAYS first ──
   let body = '';
   if (statusHTML) body += statusHTML;
   if (stageFitSection) body += stageFitSection;
+  if (staffTeamBlock) body += staffTeamBlock;
 
   if (role === 'HAIR_STYLIST') {
     body += hairMuaSection + faceSection + outfitSection + noteBlock + detailsBlock;
