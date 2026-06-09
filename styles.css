@@ -304,7 +304,8 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 
 /* ── INVENTORY ── */
 .inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
-.inv-card { background: var(--white); padding: 18px; border-radius: var(--radius); border: 1.5px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.05); }
+.inv-card { background: var(--white); padding: 14px; border-radius: var(--radius-lg); border: 1.5px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,.05); cursor: pointer; transition: all .2s; }
+.inv-card:hover { box-shadow: 0 4px 16px rgba(140,106,79,.12); border-color: var(--brown-light); transform: translateY(-1px); }
 .inv-card-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
 .inv-card-meta { font-size: 11px; color: var(--dim); font-family: var(--font-mono); margin-bottom: 8px; }
 .inv-assigned { font-size: 11px; color: var(--brown); font-family: var(--font-mono); font-weight: 500; }
@@ -384,13 +385,20 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   .upload-grid { grid-template-columns: 1fr 1fr; }
   .tab-nav { flex-wrap: wrap; gap: 4px; }
   .tab-btn { padding: 8px 14px; }
-  .model-card { min-width: 0; }
-  /* Staff dashboard mobile: tight spacing to keep nav + search above fold */
-  .staff-tab-nav { margin-bottom: 12px; gap: 8px; padding: 0; }
-  .staff-tab-btn { padding: 9px 16px; font-size: 12px; }
-  #staff-search-wrap { margin-bottom: 12px; padding: 0 16px; }
-  #staff-models-content { padding: 0 16px; }
-  .panel-content { padding: 12px 0; }
+  .model-card { min-width: 0; border-radius: var(--radius-lg); }
+  /* Inventory: 2-column compact grid on mobile */
+  .inv-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .inv-card-photo { aspect-ratio: 1/1; margin-bottom: 8px; }
+  .inv-card-no-photo { aspect-ratio: 1/1; margin-bottom: 8px; font-size: 24px; }
+  .inv-card-name { font-size: 12px; }
+  .inv-card-meta { font-size: 10px; }
+  /* Staff dashboard mobile */
+  .staff-tab-nav { margin-top: 8px; margin-bottom: 14px; gap: 8px; padding: 0 2px; }
+  .staff-tab-btn { padding: 13px 20px; font-size: 14px; font-weight: 600; }
+  #staff-search-wrap { margin-bottom: 14px; padding: 0; }
+  #staff-search-wrap .search-input { padding: 14px 16px; font-size: 15px; height: auto; }
+  #staff-models-content { padding: 0; }
+  .panel-content { padding: 16px 14px; }
 }
 
 /* ── TAB NAV ── */
