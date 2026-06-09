@@ -600,8 +600,7 @@ function renderSignedUpPanel() {
 window.toggleSignupComplete = async function toggleSignupComplete(id, checkbox) {
   const newState = checkbox.checked;
   checkbox.disabled = true;
-  const now = new Date().toISOString();
-  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: newState, updated_at: now }).eq('id', id);
+  const { error } = await sb.from('model_profiles').update({ signup_manually_complete: newState }).eq('id', id);
   if (error) {
     toast(error.message, true);
     checkbox.checked = !newState;
@@ -609,18 +608,12 @@ window.toggleSignupComplete = async function toggleSignupComplete(id, checkbox) 
     return;
   }
   const m = allModels.find(x => String(x.id) === String(id));
-  if (m) { m.signup_manually_complete = newState; m.updated_at = now; }
+  if (m) m.signup_manually_complete = newState;
   checkbox.disabled = false;
 
-  // Update the panel header label and last-updated text live
+  // Update the panel header label live (but not last-updated — that only changes when model edits)
   const lbl = document.getElementById('panel-signup-toggle-label');
-  const upd = document.getElementById('panel-signup-toggle-lastupdate');
   if (lbl) lbl.textContent = newState ? 'Signed Up' : 'Not Signed Up';
-  if (upd) {
-    const d = new Date(now);
-    upd.textContent = 'Updated ' + d.toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' })
-      + ' at ' + d.toLocaleTimeString('en-AU', { hour:'2-digit', minute:'2-digit', hour12:true });
-  }
 
   renderSignedUpPanel();
   toast(newState ? 'Marked as complete ✓' : 'Marked as pending ✓');
