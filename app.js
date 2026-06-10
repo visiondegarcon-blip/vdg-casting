@@ -277,10 +277,15 @@ async function uploadFiles(fileList, folder, subfolder, max) {
   const urls = [];
   let files = Array.from(fileList);
   if (max && files.length > max) files = files.slice(0, max);
+  let skippedEmpty = 0;
   for (const file of files) {
+    // iPhone HEIC handling can hand us a 0-byte File while transcoding finishes —
+    // uploading would create a broken "?" image. Skip and warn instead.
+    if (!file || !file.size) { skippedEmpty++; continue; }
     // Generate safe path without original filename to prevent path traversal
     const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
-    const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true });
+    const contentType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
+    const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true, contentType });
     if (!error) {
       const { data } = sb.storage.from('model-photos').getPublicUrl(path);
       urls.push(data.publicUrl);
@@ -288,6 +293,7 @@ async function uploadFiles(fileList, folder, subfolder, max) {
       console.error('Upload error:', error);
     }
   }
+  if (skippedEmpty) toast(`${skippedEmpty} photo${skippedEmpty>1?'s':''} couldn't be read — try re-picking from camera roll`, true);
   return urls;
 }
 
@@ -332,6 +338,14 @@ async function signUp() {
 async function signUpExistingModel(username, pin) {
   const nameVal = document.getElementById('signup-name').value;
   if (!nameVal) { showError('signup-error','Select your name.'); return; }
+  // Profile photo is required — prevents the broken-image / question-mark issue we hit
+  // with empty rows in the model card grid.
+  const profInput0 = document.getElementById('existing-profile-input');
+  if (!profInput0 || !profInput0.files[0] || !profInput0.files[0].size) {
+    showError('signup-error','Please tap the camera circle at the top and upload a profile photo — it\'s required to complete sign-up.');
+    document.getElementById('existing-profile-preview')?.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
   // Face photo is required
   if (!chosenFiles('ex-face').length) {
     showError('signup-error','Please upload your face close-up photo — it\'s required to complete sign-up.');
@@ -399,6 +413,14 @@ async function addOutfitsToInventory(urls, modelName) {
 async function signUpNewModel(username, pin) {
   const fullName = document.getElementById('new-full-name').value.trim();
   if (!fullName) { showError('signup-error','Enter your full name.'); return; }
+  // Profile photo is required — prevents the broken-image issue we hit
+  // when empty/missing profile pics render as ? in the model grid.
+  const profInput0 = document.getElementById('profile-photo-input');
+  if (!profInput0 || !profInput0.files[0] || !profInput0.files[0].size) {
+    showError('signup-error','Please tap the camera circle at the top and upload a profile photo — it\'s required to complete sign-up.');
+    document.getElementById('profile-preview')?.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
   // Face photo is required
   if (!chosenFiles('new-face1').length) {
     showError('signup-error','Please upload your face close-up photo — it\'s required to complete sign-up.');
@@ -981,12 +1003,21 @@ async function openModelPanel(id) {
 
   // ── Collapsible photo sections (Face / Hair+Makeup / Outfit) ──
   const outfitPh = toArr(m.outfit_photos);
-  const photoGrid = (arr) => arr.length ? `<div class="photo-grid">${arr.map(u=>`<div class="photo-thumb"><img src="${u}"/></div>`).join('')}</div>` : '<div class="no-photos">None uploaded</div>';
+  // Admin gets × on each photo to delete corrupted / wrong uploads.
+  // Filter empty/garbage URLs (legacy broken data) so they don't render as broken icons.
+  const photoGrid = (arr, field) => {
+    const clean = (arr || []).filter(u => typeof u === 'string' && u.startsWith('http'));
+    if (!clean.length) return '<div class="no-photos">None uploaded</div>';
+    return `<div class="photo-grid">${clean.map(u=>`<div class="photo-thumb">
+        <img src="${u}"/>
+        ${isAdmin && field ? `<button class="photo-thumb-x" title="Delete photo" onclick="event.stopPropagation();adminDeletePhoto('${m.id}','${field}','${u.replace(/'/g,"\\'")}')">×</button>` : ''}
+      </div>`).join('')}</div>`;
+  };
 
   const faceSection = `
     <div class="collapse-section">
       <button class="collapse-btn" onclick="toggleCollapse(this)">👤 Face Photos <span class="collapse-arrow">▾</span></button>
-      <div class="collapse-body">${photoGrid(facePh)}</div>
+      <div class="collapse-body">${photoGrid(facePh, 'face_photos')}</div>
     </div>`;
 
   // Hair and Makeup info card (texture, length, makeup status)
@@ -1017,9 +1048,9 @@ async function openModelPanel(id) {
       <button class="collapse-btn" onclick="toggleCollapse(this)">💇 Hair and Make Up Info <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
         ${hairInfoCard}
-        <div class="panel-section-title" style="margin-top:4px">Current Hairstyle</div>${photoGrid(curHairPh)}
-        <div class="panel-section-title" style="margin-top:16px">Hair Inspo</div>${photoGrid(hairPh)}
-        <div class="panel-section-title" style="margin-top:16px">Makeup Inspo</div>${photoGrid(muaPh)}
+        <div class="panel-section-title" style="margin-top:4px">Current Hairstyle</div>${photoGrid(curHairPh, 'current_hair_photos')}
+        <div class="panel-section-title" style="margin-top:16px">Hair Inspo</div>${photoGrid(hairPh, 'hair_photos')}
+        <div class="panel-section-title" style="margin-top:16px">Makeup Inspo</div>${photoGrid(muaPh, 'mua_photos')}
       </div>
     </div>`;
 
@@ -1029,7 +1060,7 @@ async function openModelPanel(id) {
     <div class="collapse-section">
       <button class="collapse-btn" onclick="toggleCollapse(this)">📸 Outfit Inspo / Pinterest <span class="collapse-arrow">▾</span></button>
       <div class="collapse-body">
-        <div class="panel-section-title" style="margin-top:4px">Outfit Inspo Photos</div>${photoGrid(photos)}
+        <div class="panel-section-title" style="margin-top:4px">Outfit Inspo Photos</div>${photoGrid(photos, 'photos')}
       </div>
     </div>`;
 
@@ -1096,6 +1127,16 @@ async function openModelPanel(id) {
       <textarea class="notes-field" id="panel-notes" maxlength="2000" onblur="saveNotes()" placeholder="Team notes…">${m.notes||''}</textarea>
     </div>
     ${adminTasksBlock(m)}
+    <div>
+      <div class="panel-section-title">Profile Photo</div>
+      ${m.profile_photo ? `
+        <div style="display:flex;align-items:center;gap:14px;margin-top:4px">
+          <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--cream);flex-shrink:0;border:1.5px solid var(--border)"><img src="${m.profile_photo}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='<div style=&quot;display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:24px;color:var(--dim)&quot;>?</div>'"/></div>
+          <button class="btn btn-sm" style="background:var(--white);border:1.5px solid var(--red);color:var(--red);width:auto" onclick="adminClearProfilePhoto('${m.id}')">🗑 Clear Profile Photo</button>
+        </div>
+        <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">If this looks broken (a ? icon), clearing it lets you assign an "Upload Profile Pic" task so the model can re-upload.</div>
+      ` : '<div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">No profile photo. Assign an "Upload Profile Pic" task to ask the model to add one.</div>'}
+    </div>
     <div>
       <button class="btn btn-sm btn-ghost" onclick="resetModelPin('${m.id}','${(m.full_name||'').replace(/'/g,"\\'")}')">🔑 Reset PIN</button>
       <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:8px">Generates a new 4-digit PIN for this model — give it to them so they can log back in.</div>
@@ -1222,6 +1263,49 @@ async function saveNotes() {
   toast('Notes saved');
 }
 
+// Admin-only: delete one photo from a model's panel. Removes the URL from the DB
+// array AND deletes the underlying storage file. Works for any photo array field.
+async function adminDeletePhoto(modelId, field, url) {
+  if (!confirm('Delete this photo? This permanently removes it from storage.')) return;
+  const m = allModels.find(x => String(x.id) === String(modelId)) || openModelData;
+  if (!m) { toast('Model not found', true); return; }
+  const newArr = toArr(m[field]).filter(u => u !== url);
+  const { error } = await sb.from('model_profiles').update({ [field]: newArr }).eq('id', modelId);
+  if (error) { toast(error.message, true); return; }
+  m[field] = newArr;
+  if (openModelData && String(openModelData.id) === String(modelId)) openModelData[field] = newArr;
+  // Delete the underlying storage file so it doesn't waste space or get re-referenced
+  const path = storagePathFromUrl(url);
+  if (path) await sb.storage.from('model-photos').remove([path]);
+  // If this was an "own outfit" photo, also drop the matching inventory row
+  if (field === 'outfit_photos') {
+    await sb.from('inventory').delete().eq('photo_url', url);
+    const { data: invData } = await sb.from('inventory').select('*').order('created_at', { ascending: false });
+    if (invData) inventoryData = invData;
+  }
+  openModelPanel(modelId); // refresh panel
+  toast('Photo deleted');
+}
+
+// Admin-only: clear a model's profile photo (e.g., when the upload was empty/broken)
+async function adminClearProfilePhoto(modelId) {
+  if (!confirm("Clear this model's profile photo? They can re-upload via an assigned 'Upload Profile Pic' task or by signing in and adding a new one.")) return;
+  const m = allModels.find(x => String(x.id) === String(modelId)) || openModelData;
+  if (!m) { toast('Model not found', true); return; }
+  const oldUrl = m.profile_photo;
+  const { error } = await sb.from('model_profiles').update({ profile_photo: null }).eq('id', modelId);
+  if (error) { toast(error.message, true); return; }
+  m.profile_photo = null;
+  if (openModelData && String(openModelData.id) === String(modelId)) openModelData.profile_photo = null;
+  if (oldUrl) {
+    const path = storagePathFromUrl(oldUrl);
+    if (path) await sb.storage.from('model-photos').remove([path]);
+  }
+  openModelPanel(modelId);
+  refreshCurrentView();
+  toast('Profile photo cleared');
+}
+
 // Permanently delete a model: removes their profile row first (so the dashboard is clean even if
 // storage cleanup below fails), then best-effort deletes their uploaded photos from storage
 async function deleteModel(id, name) {
@@ -1292,6 +1376,13 @@ async function showStaffDashboard(user) {
   // Inventory visible to all staff roles
   const invTab = document.getElementById('staff-inv-tab');
   if (invTab) invTab.style.display = '';
+  // Role-specific extra tabs
+  const unassignedTab = document.getElementById('staff-tab-unassigned');
+  const muaInspoTab   = document.getElementById('staff-tab-mua-inspo');
+  const muaNeedsTab   = document.getElementById('staff-tab-mua-needs');
+  if (unassignedTab) unassignedTab.classList.toggle('hidden', user.role !== 'STYLIST');
+  if (muaInspoTab)   muaInspoTab.classList.toggle('hidden',   user.role !== 'MAKEUP_ARTIST');
+  if (muaNeedsTab)   muaNeedsTab.classList.toggle('hidden',   user.role !== 'MAKEUP_ARTIST');
   await loadAllModels();
   await loadInventory();
   staffTab='all';
@@ -1327,6 +1418,14 @@ function renderStaffModels(search) {
 
   if (staffTab==='mine') {
     list = list.filter(m=>m[rf.assign]===currentUser.name);
+  } else if (staffTab==='stylist_unassigned' && role === 'STYLIST') {
+    list = list.filter(m => !m.assigned_stylist);
+  } else if (staffTab==='mua_inspo' && role === 'MAKEUP_ARTIST') {
+    list = list.filter(m => toArr(m.mua_photos).length > 0);
+  } else if (staffTab==='mua_needs' && role === 'MAKEUP_ARTIST') {
+    // Includes models who explicitly said they need a MUA AND those who haven't answered yet —
+    // excludes only models who confirmed they can do their own makeup.
+    list = list.filter(m => m.makeup_self !== true);
   }
   if (search) {
     const q=search.toLowerCase();
@@ -1334,7 +1433,12 @@ function renderStaffModels(search) {
   }
   const grid=document.getElementById('staff-model-grid');
   if (!grid) return;
-  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,role)).join('') : `<div class="loading-center">${staffTab==='mine'?'No models selected yet':'No models yet'}</div>`;
+  const emptyMsg = staffTab==='mine' ? 'No models selected yet'
+                 : staffTab==='stylist_unassigned' ? 'Every model has a stylist assigned 🎉'
+                 : staffTab==='mua_inspo' ? 'No models have uploaded makeup inspo yet'
+                 : staffTab==='mua_needs' ? 'No models need a MUA — every model can do their own or has been answered'
+                 : 'No models yet';
+  grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,role)).join('') : `<div class="loading-center">${emptyMsg}</div>`;
 }
 function filterStaffModels(val) { if (staffTab!=='inventory') renderStaffModels(val); }
 
@@ -1875,8 +1979,11 @@ async function uploadMorePhotos(input, field, modelId) {
   const files=Array.from(input.files); if(!files.length) return;
   const status=document.getElementById('upload-status'); if(status) status.textContent='Uploading…';
   const urls=await uploadFiles(files, modelId, field);
+  if (!urls.length) { if (status) status.textContent=''; return; }
   const { data:current }=await sb.from('model_profiles').select(field).eq('id',modelId).single();
-  const existing=current?.[field]||[];
+  // toArr() — Supabase sometimes returns text[] as JSON strings, and a raw
+  // spread of a string explodes it into individual characters.
+  const existing=toArr(current?.[field]);
   await sb.from('model_profiles').update({[field]:[...existing,...urls]}).eq('id',modelId);
   if (status) status.textContent=`✓ ${urls.length} uploaded`;
   toast('Photos uploaded ✓');
@@ -1892,6 +1999,7 @@ async function uploadMorePhotos(input, field, modelId) {
 // A model's `tasks` column = [{ key, note, done, assigned_at }].
 // ═══════════════════════════════════════════════
 const BUILTIN_TASKS = [
+  { key:'profile_pic',  icon:'🪞',   label:'Upload a profile photo',           type:'profile_photo', field:'profile_photo', max:1 },
   { key:'current_hair', icon:'💇‍♀️', label:'Upload current hairstyle photos',  type:'photos', field:'current_hair_photos', max:3 },
   { key:'face',         icon:'👤',   label:'Upload face close-up photo',       type:'photos', field:'face_photos',         max:1 },
   { key:'hair_inspo',   icon:'💇',   label:'Upload hair inspo photos',         type:'photos', field:'hair_photos',         max:3 },
@@ -2073,33 +2181,20 @@ async function removeTaskFromModel(modelId, key) {
 }
 // Admin panel block: current tasks + assign button
 function adminTasksBlock(m) {
-  const tasks = toTasks(m.tasks);
-  const cf = m.custom_fields || {};
-  const rows = tasks.length ? tasks.map(t => {
+  // Only show PENDING tasks — once a model completes a task it's done with, no need to clutter the panel.
+  const pending = toTasks(m.tasks).filter(t => !t.done);
+  const rows = pending.length ? pending.map(t => {
     const reg = taskReg(t.key);
     const label = reg ? `${reg.icon} ${reg.label}` : t.key;
-    const status = t.done ? `<span class="task-status done">✓ Done</span>` : `<span class="task-status pending">◷ Pending</span>`;
-    // Show the answer for done tasks
-    let answer = '';
-    if (t.done && reg) {
-      const isCustom = !reg.field;
-      const val = isCustom ? cf[reg.customKey] : m[reg.field];
-      if (reg.type === 'photos') {
-        const urls = toArr(val);
-        if (urls.length) answer = `<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">${urls.map(u=>`<img src="${u}" style="width:36px;height:36px;border-radius:4px;object-fit:cover"/>`).join('')}</div>`;
-      } else if (val !== undefined && val !== null && val !== '') {
-        answer = `<div class="task-admin-note" style="font-style:normal;color:var(--text)">→ ${val}</div>`;
-      }
-    }
     return `<div class="task-admin-row">
-      <div><div class="task-admin-label">${label}</div>${t.note?`<div class="task-admin-note">"${t.note}"</div>`:''}${answer}</div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">${status}<button class="task-remove-x" title="Remove" onclick="removeTaskFromModel('${m.id}','${t.key}')">×</button></div>
+      <div><div class="task-admin-label">${label}</div>${t.note?`<div class="task-admin-note">"${t.note}"</div>`:''}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="task-status pending">◷ Pending</span><button class="task-remove-x" title="Remove" onclick="removeTaskFromModel('${m.id}','${t.key}')">×</button></div>
     </div>`;
-  }).join('') : '<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">No tasks assigned.</div>';
+  }).join('') : '<div style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">No pending tasks. Completed tasks are hidden — assign more below if needed.</div>';
   return `
     <div>
       <div class="panel-section-title">Tasks</div>
-      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-4px 0 12px">Assign things for this model to complete themselves — they'll get a "Tasks to Complete" button on sign-in.</p>
+      <p style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin:-4px 0 12px">Assign things for this model to complete themselves — they'll get a "Tasks to Complete" button on sign-in. Completed tasks disappear automatically.</p>
       <div class="task-admin-list">${rows}</div>
       <button class="btn btn-sm btn-brown" style="width:auto;margin-top:12px" onclick="openTaskModal('single','${m.id}')">+ Assign Task</button>
     </div>`;
@@ -2188,6 +2283,15 @@ function openModelTaskPanel() {
           <div class="upload-zone-text">Tap to upload</div>
         </div>
         <div class="file-previews" id="task-${reg.key}-previews"></div>`;
+    } else if (reg.type === 'profile_photo') {
+      // Single photo, replaces the existing profile_photo on save
+      input = `
+        <div class="upload-zone" onclick="document.getElementById('task-${reg.key}').click()">
+          <input type="file" id="task-${reg.key}" accept="image/*" style="display:none" onchange="pickFiles('task-${reg.key}',1)"/>
+          <div class="upload-zone-icon">${reg.icon}</div>
+          <div class="upload-zone-text">Tap to upload (replaces your current profile pic)</div>
+        </div>
+        <div class="file-previews" id="task-${reg.key}-previews"></div>`;
     } else if (reg.type === 'select') {
       input = `<div class="select-wrap"><select id="taskinput-${reg.key}"><option value="">— select —</option>${reg.options.map(o=>`<option value="${o}"${curVal===o?' selected':''}>${o}</option>`).join('')}</select></div>`;
     } else if (reg.type === 'boolselect') {
@@ -2254,6 +2358,22 @@ async function submitModelTasks() {
         t.done = true; // already satisfied
       } else if (isCustom && toArr(customFields[reg.customKey]).length) {
         t.done = true;
+      }
+    } else if (reg.type === 'profile_photo') {
+      // Single-photo replace. Uploads the new file and overwrites profile_photo.
+      // Best-effort delete the old storage file so it doesn't orphan.
+      const files = chosenFiles('task-' + reg.key);
+      if (files.length) {
+        const uploaded = await uploadFiles([files[0]], modelId, 'profile', 1);
+        if (uploaded.length) {
+          const oldUrl = model.profile_photo;
+          updates.profile_photo = uploaded[0];
+          if (oldUrl) {
+            const oldPath = storagePathFromUrl(oldUrl);
+            if (oldPath) await sb.storage.from('model-photos').remove([oldPath]);
+          }
+          t.done = true;
+        }
       }
     } else if (reg.type === 'boolselect') {
       const v = document.getElementById('taskinput-' + reg.key)?.value;

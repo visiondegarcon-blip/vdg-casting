@@ -646,6 +646,11 @@
           </div>
           <button class="tab-btn staff-tab-btn active" onclick="setStaffTab(this,'all')">All Models</button>
           <button class="tab-btn staff-tab-btn" onclick="setStaffTab(this,'mine')">My Models</button>
+          <!-- Stylist-only: shows only models with no assigned stylist -->
+          <button class="tab-btn staff-tab-btn hidden" id="staff-tab-unassigned" onclick="setStaffTab(this,'stylist_unassigned')">Unassigned</button>
+          <!-- MUA-only: filters by whether they uploaded makeup inspo / explicitly need MUA -->
+          <button class="tab-btn staff-tab-btn hidden" id="staff-tab-mua-inspo" onclick="setStaffTab(this,'mua_inspo')">With Inspo Pics</button>
+          <button class="tab-btn staff-tab-btn hidden" id="staff-tab-mua-needs" onclick="setStaffTab(this,'mua_needs')">Needs MUA</button>
           <button class="tab-btn staff-tab-btn" id="staff-inv-tab" onclick="setStaffTab(this,'inventory')">Inventory</button>
         </div>
         <div id="staff-models-content">
@@ -1082,6 +1087,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
