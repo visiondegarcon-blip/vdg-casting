@@ -43,7 +43,8 @@
             <div class="select-wrap">
               <select id="signup-role" onchange="loadSignupNames()">
                 <option value="">Select role</option>
-                <option value="MODEL">Model / Applicant</option>
+                <option value="MODEL">Attendee</option>
+                <option value="CREATIVE">Creative / Performer</option>
                 <option value="STYLIST">Stylist</option>
                 <option value="HAIR_STYLIST">Hair Stylist</option>
                 <option value="MAKEUP_ARTIST">Makeup Artist</option>
@@ -507,6 +508,157 @@
             </div>
           </div>
 
+          <!-- CREATIVE FLOW -->
+          <div id="creative-signup-flow" class="hidden">
+            <div class="new-model-toggle" onclick="toggleNewCreative()">
+              <div class="new-model-toggle-icon">✨</div>
+              <div>
+                <div class="new-model-toggle-text">I'm a new creative</div>
+                <div class="new-model-toggle-sub">Register fresh</div>
+              </div>
+            </div>
+
+            <div class="divider"><span>or select your name</span></div>
+
+            <div id="existing-creative-section">
+              <div class="form-group">
+                <label>Select Your Name</label>
+                <div class="select-wrap">
+                  <select id="signup-creative-name" onchange="showExistingCreativeExtras()">
+                    <option value="">— choose your name —</option>
+                  </select>
+                </div>
+              </div>
+              <div id="existing-creative-extras" class="hidden"></div>
+            </div>
+
+            <div id="new-creative-form" class="hidden">
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="cr-new-full-name" placeholder="e.g. Jordan Sullivan"/>
+              </div>
+              <div class="form-group">
+                <label>Instagram @</label>
+                <input type="text" id="cr-new-instagram" placeholder="handle without @" autocapitalize="none"/>
+              </div>
+              <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" id="cr-new-phone" placeholder="04xx xxx xxx"/>
+              </div>
+              <div class="form-group">
+                <label>Age</label>
+                <input type="number" id="cr-new-age" placeholder="e.g. 21" min="14" max="60"/>
+              </div>
+              <div class="form-group">
+                <label>Gender</label>
+                <div class="select-wrap">
+                  <select id="cr-new-gender">
+                    <option value="">Select</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Non-binary">Non-binary</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Suburb</label>
+                <input type="text" id="cr-new-suburb" placeholder="e.g. Logan"/>
+              </div>
+              <div class="form-group">
+                <label>Are you signed to an agency/contract?</label>
+                <div class="select-wrap">
+                  <select id="cr-new-agency">
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Are you free the WHOLE DAY on July 5?</label>
+                <div class="select-wrap">
+                  <select id="cr-new-free">
+                    <option value="true">Yes, all day</option>
+                    <option value="false">No / not sure</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Tell us a little about yourself</label>
+                <textarea id="cr-new-bio" placeholder="Your background, what you do, what drives you…" rows="3"></textarea>
+              </div>
+              <div class="form-group">
+                <label>What would your performance look like?</label>
+                <textarea id="cr-new-perf-desc" placeholder="Describe what you'd perform on the night…" rows="2"></textarea>
+              </div>
+              <div class="form-group">
+                <label>Equipment needed (besides microphones)</label>
+                <input type="text" id="cr-new-equipment" placeholder="e.g. in-ears, lighting, backdrop"/>
+              </div>
+              <div class="form-group">
+                <label>How long of allocated time would you need?</label>
+                <div class="select-wrap">
+                  <select id="cr-new-time">
+                    <option value="">Select</option>
+                    <option value="1-5 minutes">1-5 minutes</option>
+                    <option value="5-10 minutes">5-10 minutes</option>
+                    <option value="10-15 minutes">10-15 minutes</option>
+                    <option value="15+ minutes">15+ minutes</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Shared creative fields (both existing + new) -->
+            <div id="creative-shared-fields" class="hidden">
+              <div style="margin-top:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--black)">
+                <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase">CREATIVE DETAILS</div>
+                <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Required for all creatives</div>
+              </div>
+              <div class="form-group">
+                <label>What type of creative are you? *</label>
+                <div class="select-wrap">
+                  <select id="cr-type">
+                    <option value="">— select type —</option>
+                    <option value="Singer">Singer</option>
+                    <option value="Rapper">Rapper</option>
+                    <option value="Dancer">Dancer</option>
+                    <option value="Poet">Poet</option>
+                    <option value="Band / Instrumental">Band / Instrumental</option>
+                    <option value="Showcase">Showcase</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Profile Picture *</label>
+                <div class="profile-photo-upload">
+                  <div class="profile-photo-preview" id="cr-profile-preview" onclick="document.getElementById('cr-profile-input').click()">
+                    📸
+                    <input type="file" id="cr-profile-input" accept="image/*" onchange="previewCreativeProfile(this)" style="display:none"/>
+                  </div>
+                  <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload your profile picture</div>
+                </div>
+              </div>
+              <div style="margin-top:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--black)">
+                <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase">BACKGROUND MUSIC</div>
+                <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Upload a track or paste a link (or both)</div>
+              </div>
+              <div class="form-group">
+                <label>Upload Music File <span style="color:var(--dim)">(MP3, WAV, M4A — max 25 MB)</span></label>
+                <div class="upload-zone" onclick="document.getElementById('cr-music-file').click()">
+                  <input type="file" id="cr-music-file" accept=".mp3,.wav,.m4a,audio/mpeg,audio/wav,audio/x-m4a,audio/mp4" style="display:none" onchange="previewMusicFile(this)"/>
+                  <div class="upload-zone-icon">🎵</div>
+                  <div class="upload-zone-text">Tap to upload your background music</div>
+                </div>
+                <div id="cr-music-file-preview" style="font-size:12px;color:var(--brown);font-family:var(--font-mono);margin-top:6px"></div>
+              </div>
+              <div class="form-group">
+                <label>Music Link <span style="color:var(--dim)">(YouTube, SoundCloud, Dropbox, etc.)</span></label>
+                <input type="url" id="cr-music-link" placeholder="https://..." autocapitalize="none"/>
+              </div>
+            </div>
+          </div>
+
           <!-- STAFF FLOW -->
           <div id="staff-signup-flow" class="hidden">
             <div class="new-model-toggle" onclick="toggleNewStaff()">
@@ -567,6 +719,7 @@
       <div class="sidebar-event">Brisbane — Jul 5</div>
       <nav class="sidebar-nav">
         <button class="nav-item active" onclick="adminNav('models',this)"><span class="nav-icon">◉</span> All Models</button>
+        <button class="nav-item" onclick="adminNav('creatives',this)"><span class="nav-icon">♫</span> Creatives</button>
         <button class="nav-item" onclick="adminNav('inventory',this)"><span class="nav-icon">◫</span> Inventory</button>
         <button class="nav-item" onclick="adminNav('team',this)"><span class="nav-icon">◈</span> Team</button>
       </nav>
@@ -610,9 +763,40 @@
           <div class="team-grid" id="team-grid"></div>
           <div id="manage-users-section" style="margin-top:36px"></div>
         </div>
+        <div id="creatives-tab-content" class="hidden">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <span class="dim-text" id="creatives-count">0 creatives</span>
+            <input type="text" class="search-input" placeholder="Search creatives…" oninput="filterCreatives(this.value)" id="creative-search" style="max-width:200px"/>
+          </div>
+          <div class="model-grid" id="admin-creative-grid"></div>
+        </div>
       </div>
     </main>
   </section>
+
+  <!-- CREATIVE DASHBOARD -->
+  <section id="creative-dashboard" class="dashboard hidden">
+    <div class="mob-topbar">
+      <div class="mob-logo">VDG</div>
+      <button class="signout-btn" onclick="logout()">Out</button>
+    </div>
+    <div class="model-profile-wrap" id="creative-profile-wrap"></div>
+  </section>
+
+  <!-- CREATIVE DETAIL PANEL (admin) -->
+  <div class="panel-overlay hidden" id="creative-panel-overlay" onclick="closeCreativePanel(event)">
+    <div class="model-panel" id="creative-panel">
+      <div class="panel-header">
+        <div style="flex:1;min-width:0">
+          <div class="panel-name" id="cr-panel-name"></div>
+          <div class="panel-handle" id="cr-panel-handle"></div>
+        </div>
+        <div class="panel-flag" id="cr-panel-type-badge"></div>
+        <button class="panel-close" onclick="closeCreativePanel()">✕</button>
+      </div>
+      <div class="panel-body" id="cr-panel-body"></div>
+    </div>
+  </div>
 
   <!-- STAFF DASHBOARD -->
   <section id="staff-dashboard" class="dashboard hidden">
@@ -1087,6 +1271,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 </body>
 </html>

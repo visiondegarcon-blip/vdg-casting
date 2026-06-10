@@ -62,6 +62,9 @@ let staffUsers       = [];
 let currentModelData = null; // used by Edit Details panel
 let editProfileFile  = null; // stores selected profile photo file until save
 let customTaskDefs   = []; // loaded from custom_tasks table
+let allCreatives     = []; // creative_profiles array
+let isNewCreative    = false;
+let currentCreativeData = null; // creative logged in as CREATIVE role
 
 // ═══════════════════════════════════════════════
 // AUTH TABS
@@ -198,6 +201,28 @@ async function loadSignupNames() {
 
   if (!role) return;
 
+  // CREATIVE flow
+  const creativeFlow = document.getElementById('creative-signup-flow');
+  creativeFlow.classList.add('hidden');
+
+  if (role === 'CREATIVE') {
+    creativeFlow.classList.remove('hidden');
+    credGroup.classList.remove('hidden');
+    btn.classList.remove('hidden');
+    const { data } = await sb.from('creative_profiles').select('id,full_name').eq('registered',false).order('full_name');
+    const sel = document.getElementById('signup-creative-name');
+    sel.innerHTML = '<option value="">— choose your name —</option>';
+    (data||[]).forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.full_name}</option>`; });
+    document.getElementById('existing-creative-extras').classList.add('hidden');
+    document.getElementById('creative-shared-fields').classList.add('hidden');
+    isNewCreative = false;
+    document.getElementById('new-creative-form').classList.add('hidden');
+    document.getElementById('existing-creative-section').classList.remove('hidden');
+    const toggle = document.querySelector('#creative-signup-flow .new-model-toggle');
+    if (toggle) { toggle.style.cssText=''; toggle.querySelector('.new-model-toggle-text').style.color=''; toggle.querySelector('.new-model-toggle-sub').style.color=''; toggle.querySelector('.new-model-toggle-icon').textContent='✨'; }
+    return;
+  }
+
   if (role === 'MODEL') {
     modelFlow.classList.remove('hidden');
     credGroup.classList.remove('hidden');
@@ -314,6 +339,10 @@ async function signUp() {
   btn.textContent = 'Creating…'; btn.disabled = true;
 
   try {
+    if (role === 'CREATIVE') {
+      await signUpCreative(username, pin);
+      return;
+    }
     if (role === 'MODEL') {
       if (isNewModel) { await signUpNewModel(username, pin); }
       else            { await signUpExistingModel(username, pin); }
@@ -517,6 +546,13 @@ async function signIn() {
     showModelDashboard(model);
     return;
   }
+  const { data:creative } = await sb.from('creative_profiles').select('*').eq('username',username).maybeSingle();
+  if (creative) {
+    if (creative.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
+    currentUser = { id:creative.id, name:creative.full_name, role:'CREATIVE', username };
+    showCreativeDashboard(creative);
+    return;
+  }
   const { data:user } = await sb.from('users').select('*').eq('username',username).maybeSingle();
   if (!user) { showError('signin-error','Username not found.'); return; }
   if (user.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
@@ -581,17 +617,39 @@ function adminNav(page, btn) {
   document.querySelectorAll('#admin-dashboard .nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('admin-models-panel').classList.remove('hidden');
-  const titles = { models:'All Models', team:'Team' };
+  const titles = { models:'All Models', team:'Team', creatives:'Creatives' };
   document.getElementById('admin-page-title').textContent = titles[page]||'';
+  // Hide all tab contents first
+  ['models-tab-content','inventory-tab-content','team-tab-content','creatives-tab-content'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.classList.add('hidden');
+  });
+  // Hide topbar action buttons for non-model pages
+  const topbarActions = document.querySelector('.topbar-actions');
+  const tabNav = document.querySelector('#admin-models-panel .tab-nav');
   if (page === 'models') {
+    if (topbarActions) topbarActions.style.display = '';
+    if (tabNav) tabNav.style.display = '';
     document.getElementById('model-search').style.display = '';
-    // reset to All tab
     const allBtn = document.querySelector('#admin-models-panel .tab-btn');
     if (allBtn) setAdminTab(allBtn, 'all');
+  } else if (page === 'creatives') {
+    if (topbarActions) topbarActions.style.display = 'none';
+    if (tabNav) tabNav.style.display = 'none';
+    document.getElementById('model-search').style.display = 'none';
+    document.getElementById('creatives-tab-content').classList.remove('hidden');
+    loadAllCreatives().then(() => renderAdminCreatives());
   } else if (page === 'team') {
+    if (topbarActions) topbarActions.style.display = 'none';
+    if (tabNav) tabNav.style.display = 'none';
     document.getElementById('model-search').style.display = 'none';
     const teamBtn = document.getElementById('tab-team');
     if (teamBtn) setAdminTab(teamBtn, 'team');
+  } else if (page === 'inventory') {
+    if (topbarActions) topbarActions.style.display = 'none';
+    if (tabNav) tabNav.style.display = 'none';
+    document.getElementById('model-search').style.display = 'none';
+    document.getElementById('inventory-tab-content').classList.remove('hidden');
+    loadInventory().then(() => renderInventoryGrid('inv-grid','inv-count',true));
   }
 }
 
@@ -602,10 +660,11 @@ async function setAdminTab(btn, tab) {
   const modelsContent = document.getElementById('models-tab-content');
   const invContent    = document.getElementById('inventory-tab-content');
   const teamContent   = document.getElementById('team-tab-content');
+  const crContent     = document.getElementById('creatives-tab-content');
   const searchEl      = document.getElementById('model-search');
 
   // hide all tab bodies first
-  [modelsContent, invContent, teamContent].forEach(el => el?.classList.add('hidden'));
+  [modelsContent, invContent, teamContent, crContent].forEach(el => el?.classList.add('hidden'));
 
   if (tab === 'inventory') {
     invContent.classList.remove('hidden');
@@ -2518,6 +2577,433 @@ async function deleteUser(id, name) {
   toast(`${(name||'User').split(' ')[0]} deleted`);
   await loadStaffUsers();
   renderTeam();
+}
+
+// ═══════════════════════════════════════════════
+// CREATIVE SYSTEM
+// ═══════════════════════════════════════════════
+
+async function loadAllCreatives() {
+  const { data } = await sb.from('creative_profiles').select('*').order('full_name');
+  allCreatives = data || [];
+}
+
+function toggleNewCreative() {
+  isNewCreative = !isNewCreative;
+  document.getElementById('new-creative-form').classList.toggle('hidden', !isNewCreative);
+  document.getElementById('existing-creative-section').classList.toggle('hidden', isNewCreative);
+  const shared = document.getElementById('creative-shared-fields');
+  if (isNewCreative) shared.classList.remove('hidden');
+  else if (!document.getElementById('signup-creative-name').value) shared.classList.add('hidden');
+  const toggle = document.querySelector('#creative-signup-flow .new-model-toggle');
+  if (isNewCreative) {
+    toggle.style.background='var(--brown)'; toggle.style.borderColor='var(--brown)';
+    toggle.querySelector('.new-model-toggle-text').style.color='white';
+    toggle.querySelector('.new-model-toggle-sub').style.color='rgba(255,255,255,.7)';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✓';
+  } else {
+    toggle.style.cssText='';
+    toggle.querySelector('.new-model-toggle-text').style.color='';
+    toggle.querySelector('.new-model-toggle-sub').style.color='';
+    toggle.querySelector('.new-model-toggle-icon').textContent='✨';
+  }
+}
+
+function showExistingCreativeExtras() {
+  const val = document.getElementById('signup-creative-name').value;
+  const extras = document.getElementById('existing-creative-extras');
+  const shared = document.getElementById('creative-shared-fields');
+  if (val) {
+    extras.classList.remove('hidden');
+    shared.classList.remove('hidden');
+    // Pre-fill with existing data
+    prefillExistingCreative(val);
+  } else {
+    extras.classList.add('hidden');
+    shared.classList.add('hidden');
+  }
+}
+
+async function prefillExistingCreative(id) {
+  const { data: c } = await sb.from('creative_profiles').select('*').eq('id', id).maybeSingle();
+  if (!c) return;
+  const extras = document.getElementById('existing-creative-extras');
+  extras.innerHTML = `
+    <div style="padding:14px;background:var(--cream);border-radius:var(--radius-sm);border:1.5px solid var(--border);margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px">${c.full_name||''}</div>
+      ${c.instagram ? `<div style="font-size:12px;color:var(--dim)">@${c.instagram}</div>` : ''}
+      ${c.bio ? `<div style="font-size:12px;color:var(--text);margin-top:8px;line-height:1.5">${c.bio}</div>` : ''}
+      ${c.creative_type ? `<div style="margin-top:8px"><span class="badge badge-brown">${c.creative_type}</span></div>` : ''}
+    </div>`;
+  if (c.creative_type) {
+    const sel = document.getElementById('cr-type');
+    if (sel) { for (const o of sel.options) { if (o.value === c.creative_type) { o.selected = true; break; } } }
+  }
+}
+
+function previewCreativeProfile(input) {
+  const file = input.files[0]; if (!file) return;
+  const r = new FileReader();
+  r.onload = e => { const p = document.getElementById('cr-profile-preview'); p.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`; p.appendChild(input); };
+  r.readAsDataURL(file);
+}
+
+function previewMusicFile(input) {
+  const file = input.files[0];
+  const preview = document.getElementById('cr-music-file-preview');
+  if (!file) { preview.textContent = ''; return; }
+  if (file.size > 25 * 1024 * 1024) {
+    preview.innerHTML = '<span style="color:var(--red)">This file is too large. Please upload a smaller file or provide a YouTube, SoundCloud, Dropbox, Google Drive or other public link instead.</span>';
+    input.value = '';
+    return;
+  }
+  preview.textContent = `✓ ${file.name} (${(file.size/1024/1024).toFixed(1)} MB)`;
+}
+
+async function uploadMusicFile(file, folder) {
+  if (!file || !file.size) return '';
+  const ext = file.name.split('.').pop().toLowerCase();
+  const path = `${folder}/music/${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
+  const contentType = { mp3:'audio/mpeg', wav:'audio/wav', m4a:'audio/mp4' }[ext] || 'application/octet-stream';
+  const { error } = await sb.storage.from('creative-files').upload(path, file, { upsert: true, contentType });
+  if (error) { console.error('Music upload error:', error); return ''; }
+  const { data } = sb.storage.from('creative-files').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function uploadCreativePhoto(file, folder) {
+  if (!file || !file.size) return '';
+  const path = `${folder}/profile/${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+  const contentType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
+  const { error } = await sb.storage.from('creative-files').upload(path, file, { upsert: true, contentType });
+  if (error) { console.error('Photo upload error:', error); return ''; }
+  const { data } = sb.storage.from('creative-files').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ── CREATIVE SIGN UP ──
+async function signUpCreative(username, pin) {
+  const crType = document.getElementById('cr-type').value;
+  if (!crType) { showError('signup-error', 'Please select what type of creative you are.'); return; }
+  const profInput = document.getElementById('cr-profile-input');
+  if (!profInput || !profInput.files[0] || !profInput.files[0].size) {
+    showError('signup-error', 'Please upload your profile picture — it\'s required.');
+    document.getElementById('cr-profile-preview')?.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+  const musicFile = document.getElementById('cr-music-file')?.files[0] || null;
+  const musicLink = document.getElementById('cr-music-link')?.value.trim() || '';
+  if (musicFile && musicFile.size > 25 * 1024 * 1024) {
+    showError('signup-error', 'Music file is too large (max 25 MB). Upload a smaller file or use a link.');
+    return;
+  }
+
+  if (isNewCreative) {
+    await signUpNewCreative(username, pin, crType, profInput.files[0], musicFile, musicLink);
+  } else {
+    await signUpExistingCreative(username, pin, crType, profInput.files[0], musicFile, musicLink);
+  }
+}
+
+async function signUpExistingCreative(username, pin, crType, profileFile, musicFile, musicLink) {
+  const nameVal = document.getElementById('signup-creative-name').value;
+  if (!nameVal) { showError('signup-error', 'Select your name.'); return; }
+  const { data: ex } = await sb.from('creative_profiles').select('id').eq('username', username).maybeSingle();
+  if (ex && String(ex.id) !== String(nameVal)) { showError('signup-error', 'Username already taken.'); return; }
+
+  showError('signup-error', 'Uploading, please wait…');
+  const folder = nameVal;
+  const profileUrl = await uploadCreativePhoto(profileFile, folder);
+  let musicFileUrl = '';
+  if (musicFile) musicFileUrl = await uploadMusicFile(musicFile, folder);
+
+  const updates = { username, pin, registered: true, creative_type: crType, profile_photo: profileUrl };
+  if (musicFileUrl) updates.music_file_url = musicFileUrl;
+  if (musicLink) updates.music_link = musicLink;
+
+  const { error } = await sb.from('creative_profiles').update(updates).eq('id', nameVal);
+  if (error) { showError('signup-error', error.message); return; }
+  document.getElementById('signup-error').textContent = '';
+  toast('Account created! Sign in now.');
+  showTab('signin');
+}
+
+async function signUpNewCreative(username, pin, crType, profileFile, musicFile, musicLink) {
+  const fullName = document.getElementById('cr-new-full-name').value.trim();
+  if (!fullName) { showError('signup-error', 'Enter your full name.'); return; }
+  const { data: ex } = await sb.from('creative_profiles').select('id').eq('username', username).maybeSingle();
+  if (ex) { showError('signup-error', 'Username already taken.'); return; }
+
+  const gender = document.getElementById('cr-new-gender').value;
+  if (!gender) { showError('signup-error', 'Please select your gender.'); return; }
+  const phone = document.getElementById('cr-new-phone').value.trim();
+  if (!phone) { showError('signup-error', 'Please enter your phone number.'); return; }
+  const suburb = document.getElementById('cr-new-suburb').value.trim();
+  if (!suburb) { showError('signup-error', 'Please enter your suburb.'); return; }
+  const timeNeeded = document.getElementById('cr-new-time').value;
+  if (!timeNeeded) { showError('signup-error', 'Please select how much time you need.'); return; }
+
+  showError('signup-error', 'Uploading, please wait…');
+  const folder = 'cr_new_' + Date.now();
+  const profileUrl = await uploadCreativePhoto(profileFile, folder);
+  let musicFileUrl = '';
+  if (musicFile) musicFileUrl = await uploadMusicFile(musicFile, folder);
+
+  const payload = {
+    full_name: fullName,
+    instagram: document.getElementById('cr-new-instagram').value.trim(),
+    phone,
+    age: document.getElementById('cr-new-age').value || null,
+    gender,
+    suburb,
+    agency: document.getElementById('cr-new-agency').value,
+    free_5july: document.getElementById('cr-new-free').value === 'true',
+    bio: document.getElementById('cr-new-bio').value.trim(),
+    creative_type: crType,
+    performance_description: document.getElementById('cr-new-perf-desc').value.trim(),
+    equipment_needed: document.getElementById('cr-new-equipment').value.trim(),
+    time_needed: timeNeeded,
+    profile_photo: profileUrl,
+    music_file_url: musicFileUrl,
+    music_link: musicLink,
+    username, pin, registered: true,
+    tags: [], notes: ''
+  };
+
+  const { error } = await sb.from('creative_profiles').insert(payload);
+  if (error) { showError('signup-error', error.message); return; }
+  document.getElementById('signup-error').textContent = '';
+  toast('Account created! Sign in now.');
+  showTab('signin');
+}
+
+// ── ADMIN CREATIVES VIEW ──
+function renderAdminCreatives(search) {
+  let list = allCreatives;
+  if (search) {
+    const q = search.toLowerCase();
+    list = list.filter(c => (c.full_name||'').toLowerCase().includes(q) || (c.instagram||'').toLowerCase().includes(q) || (c.creative_type||'').toLowerCase().includes(q));
+  }
+  const grid = document.getElementById('admin-creative-grid');
+  const count = document.getElementById('creatives-count');
+  if (count) count.textContent = `${list.length} creative${list.length !== 1 ? 's' : ''}`;
+  if (!grid) return;
+  grid.innerHTML = list.length
+    ? list.map(c => creativeCardHTML(c)).join('')
+    : '<div class="loading-center" style="grid-column:1/-1">No creatives yet</div>';
+}
+
+function creativeCardHTML(c) {
+  const initials = (c.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const avatar = c.profile_photo ? `<img src="${c.profile_photo}" alt=""/>` : initials;
+  const signedUp = c.registered;
+
+  return `<div class="model-card" onclick="openCreativePanel('${c.id}')">
+    <div class="model-card-top">
+      <div class="model-avatar">${avatar}</div>
+      <div class="model-card-info">
+        <div class="model-name">${c.full_name||'—'}</div>
+        ${c.instagram ? `<div class="model-handle">@${c.instagram}</div>` : ''}
+      </div>
+    </div>
+    <div class="model-card-badges">
+      <span class="badge badge-brown">${c.creative_type||'Unknown'}</span>
+      ${signedUp ? '<span class="badge badge-green">Signed Up</span>' : '<span class="badge badge-dim">Not Registered</span>'}
+      ${c.music_file_url || c.music_link ? '<span class="badge badge-blue">🎵 Music</span>' : ''}
+    </div>
+    <div class="model-card-meta">
+      ${c.suburb ? `<span>${c.suburb}</span>` : ''}
+      ${c.time_needed ? `<span>⏱ ${c.time_needed}</span>` : ''}
+    </div>
+  </div>`;
+}
+
+function filterCreatives(val) { renderAdminCreatives(val); }
+
+// ── CREATIVE DETAIL PANEL (admin) ──
+async function openCreativePanel(id) {
+  const { data: c } = await sb.from('creative_profiles').select('*').eq('id', id).maybeSingle();
+  if (!c) { toast('Creative not found', true); return; }
+  const idx = allCreatives.findIndex(x => String(x.id) === String(id));
+  if (idx >= 0) allCreatives[idx] = c;
+
+  document.getElementById('cr-panel-name').textContent = c.full_name || '—';
+  document.getElementById('cr-panel-handle').textContent = c.instagram ? '@' + c.instagram : '';
+  document.getElementById('cr-panel-type-badge').innerHTML = `<span class="badge badge-brown" style="font-size:12px">${c.creative_type||'—'}</span>`;
+
+  const musicSection = [];
+  if (c.music_file_url) {
+    musicSection.push(`<div style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">UPLOADED TRACK</div>
+      <audio controls preload="metadata" style="width:100%;border-radius:var(--radius-sm)"><source src="${c.music_file_url}"/></audio>
+    </div>`);
+  }
+  if (c.music_link) {
+    musicSection.push(`<div style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">MUSIC LINK</div>
+      <a href="${c.music_link}" target="_blank" rel="noopener" style="color:var(--brown);word-break:break-all;font-size:13px">${c.music_link}</a>
+    </div>`);
+  }
+
+  const detail = (label, val) => val ? `<div class="detail-item"><span class="detail-label">${label}</span><span class="detail-value">${val}</span></div>` : '';
+
+  document.getElementById('cr-panel-body').innerHTML = `
+    ${c.profile_photo ? `<div style="text-align:center;margin-bottom:20px"><img src="${c.profile_photo}" style="width:120px;height:120px;object-fit:cover;border-radius:50%;border:3px solid var(--beige)"/></div>` : ''}
+
+    ${c.bio ? `<div style="margin-bottom:20px">
+      <div class="panel-section-title">About</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--text)">${c.bio}</div>
+    </div>` : ''}
+
+    ${musicSection.length ? `<div style="margin-bottom:20px">
+      <div class="panel-section-title">Music</div>
+      ${musicSection.join('')}
+    </div>` : ''}
+
+    <div style="margin-bottom:20px">
+      <div class="panel-section-title">Details</div>
+      <div class="detail-grid">
+        ${detail('Type', c.creative_type)}
+        ${detail('Gender', c.gender)}
+        ${detail('Age', c.age)}
+        ${detail('Phone', c.phone)}
+        ${detail('Suburb', c.suburb)}
+        ${detail('Agency', c.agency)}
+        ${detail('Free July 5', c.free_5july ? 'Yes' : 'No')}
+        ${detail('Time Needed', c.time_needed)}
+        ${detail('Equipment', c.equipment_needed)}
+        ${detail('Performance', c.performance_description)}
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div class="panel-section-title">Tags</div>
+      <div class="tag-list" id="cr-tag-list">
+        ${toArr(c.tags).map(t => `<span class="tag">${t} <button onclick="removeCreativeTag('${c.id}','${t.replace(/'/g,"\\'")}')">×</button></span>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <input id="cr-new-tag-input" placeholder="Add tag…" style="flex:1;padding:8px 10px;font-size:12px"/>
+        <button class="btn btn-sm btn-brown" style="width:auto;margin:0" onclick="addCreativeTag('${c.id}')">+</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div class="panel-section-title">Internal Notes</div>
+      <textarea id="cr-notes-textarea" rows="3" style="width:100%;font-size:13px" onblur="saveCreativeNotes('${c.id}')">${c.notes||''}</textarea>
+    </div>
+
+    <div style="padding-top:16px;border-top:1.5px solid var(--beige)">
+      <button class="btn btn-sm" style="background:none;border:1.5px solid var(--red);color:var(--red);width:100%" onclick="deleteCreative('${c.id}','${(c.full_name||'').replace(/'/g,"\\'")}')">🗑 Delete Creative</button>
+    </div>
+  `;
+
+  document.getElementById('creative-panel-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeCreativePanel(e) {
+  if (e && e.target !== e.currentTarget) return;
+  document.getElementById('creative-panel-overlay').classList.add('hidden');
+  document.body.style.overflow = '';
+}
+
+async function addCreativeTag(id) {
+  const input = document.getElementById('cr-new-tag-input');
+  const tag = input.value.trim(); if (!tag) return;
+  const c = allCreatives.find(x => String(x.id) === String(id));
+  const tags = [...toArr(c?.tags || []), tag];
+  const { error } = await sb.from('creative_profiles').update({ tags }).eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  input.value = '';
+  if (c) c.tags = tags;
+  openCreativePanel(id);
+}
+
+async function removeCreativeTag(id, tag) {
+  const c = allCreatives.find(x => String(x.id) === String(id));
+  const tags = toArr(c?.tags || []).filter(t => t !== tag);
+  const { error } = await sb.from('creative_profiles').update({ tags }).eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  if (c) c.tags = tags;
+  openCreativePanel(id);
+}
+
+async function saveCreativeNotes(id) {
+  const notes = document.getElementById('cr-notes-textarea')?.value || '';
+  const { error } = await sb.from('creative_profiles').update({ notes }).eq('id', id);
+  if (error) toast(error.message, true);
+  else { const c = allCreatives.find(x => String(x.id) === String(id)); if (c) c.notes = notes; }
+}
+
+async function deleteCreative(id, name) {
+  if (!confirm(`Delete ${name || 'this creative'}? This cannot be undone.`)) return;
+  const { error } = await sb.from('creative_profiles').delete().eq('id', id);
+  if (error) { toast(error.message, true); return; }
+  allCreatives = allCreatives.filter(c => String(c.id) !== String(id));
+  closeCreativePanel();
+  renderAdminCreatives();
+  toast(`${(name||'Creative').split(' ')[0]} deleted`);
+}
+
+// ── CREATIVE DASHBOARD (post sign-in) ──
+function showCreativeDashboard(c) {
+  hideAll();
+  currentCreativeData = c;
+  document.getElementById('creative-dashboard').classList.remove('hidden');
+  document.getElementById('panel-back-btn')?.classList.remove('hidden');
+  const wrap = document.getElementById('creative-profile-wrap');
+
+  const initials = (c.full_name||'??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const avatar = c.profile_photo ? `<img src="${c.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>` : `<div style="width:90px;height:90px;border-radius:50%;background:var(--beige);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:600;color:var(--brown)">${initials}</div>`;
+
+  const musicSection = [];
+  if (c.music_file_url) {
+    musicSection.push(`<div style="margin-bottom:12px">
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">YOUR UPLOADED TRACK</div>
+      <audio controls preload="metadata" style="width:100%;border-radius:var(--radius-sm)"><source src="${c.music_file_url}"/></audio>
+    </div>`);
+  }
+  if (c.music_link) {
+    musicSection.push(`<div>
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">YOUR MUSIC LINK</div>
+      <a href="${c.music_link}" target="_blank" rel="noopener" style="color:var(--brown);word-break:break-all;font-size:13px">${c.music_link}</a>
+    </div>`);
+  }
+
+  wrap.innerHTML = `
+    <div class="model-profile-card">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="width:90px;height:90px;margin:0 auto 12px;border-radius:50%;overflow:hidden;border:3px solid var(--beige)">${avatar}</div>
+        <div style="font-family:var(--font-display);font-size:24px;font-weight:400;letter-spacing:.04em">${c.full_name||'—'}</div>
+        ${c.instagram ? `<div style="font-size:13px;color:var(--dim)">@${c.instagram}</div>` : ''}
+        <div style="margin-top:8px"><span class="badge badge-brown">${c.creative_type||'Creative'}</span></div>
+      </div>
+
+      ${c.bio ? `<div class="model-section">
+        <div class="model-section-title">About You</div>
+        <div style="font-size:13px;line-height:1.6;color:var(--text)">${c.bio}</div>
+      </div>` : ''}
+
+      ${musicSection.length ? `<div class="model-section">
+        <div class="model-section-title">Your Music</div>
+        ${musicSection.join('')}
+      </div>` : ''}
+
+      <div class="model-section">
+        <div class="model-section-title">Your Details</div>
+        <div class="detail-grid">
+          <div class="detail-item"><span class="detail-label">Type</span><span class="detail-value">${c.creative_type||'—'}</span></div>
+          <div class="detail-item"><span class="detail-label">Gender</span><span class="detail-value">${c.gender||'—'}</span></div>
+          <div class="detail-item"><span class="detail-label">Age</span><span class="detail-value">${c.age||'—'}</span></div>
+          <div class="detail-item"><span class="detail-label">Suburb</span><span class="detail-value">${c.suburb||'—'}</span></div>
+          <div class="detail-item"><span class="detail-label">Free July 5</span><span class="detail-value">${c.free_5july ? 'Yes' : 'No'}</span></div>
+          <div class="detail-item"><span class="detail-label">Time Needed</span><span class="detail-value">${c.time_needed||'—'}</span></div>
+          ${c.equipment_needed ? `<div class="detail-item"><span class="detail-label">Equipment</span><span class="detail-value">${c.equipment_needed}</span></div>` : ''}
+          ${c.performance_description ? `<div class="detail-item"><span class="detail-label">Performance</span><span class="detail-value">${c.performance_description}</span></div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 // ═══════════════════════════════════════════════
