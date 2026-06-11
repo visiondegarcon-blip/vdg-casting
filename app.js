@@ -303,22 +303,41 @@ async function uploadFiles(fileList, folder, subfolder, max) {
   let files = Array.from(fileList);
   if (max && files.length > max) files = files.slice(0, max);
   let skippedEmpty = 0;
+  let failed = 0;
+  let lastError = '';
   for (const file of files) {
     // iPhone HEIC handling can hand us a 0-byte File while transcoding finishes —
     // uploading would create a broken "?" image. Skip and warn instead.
     if (!file || !file.size) { skippedEmpty++; continue; }
+    // Supabase free tier rejects files over 50MB outright; warn earlier so the user
+    // can swap a smaller photo instead of seeing a vague "failed to fetch".
+    if (file.size > 50 * 1024 * 1024) {
+      failed++;
+      lastError = `${file.name||'A photo'} is too large (${(file.size/1024/1024).toFixed(1)} MB). Max 50MB per photo.`;
+      continue;
+    }
+    const ext = (file.name||'').split('.').pop().toLowerCase();
     // Generate safe path without original filename to prevent path traversal
-    const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+    const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}${ext && ext.length <= 5 ? '.' + ext : ''}`;
     const contentType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
-    const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true, contentType });
-    if (!error) {
-      const { data } = sb.storage.from('model-photos').getPublicUrl(path);
-      urls.push(data.publicUrl);
-    } else {
-      console.error('Upload error:', error);
+    try {
+      const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true, contentType });
+      if (!error) {
+        const { data } = sb.storage.from('model-photos').getPublicUrl(path);
+        urls.push(data.publicUrl);
+      } else {
+        failed++;
+        lastError = error.message || 'Upload failed';
+        console.error('Upload error:', error);
+      }
+    } catch (e) {
+      failed++;
+      lastError = e?.message || 'Network error';
+      console.error('Upload exception:', e);
     }
   }
   if (skippedEmpty) toast(`${skippedEmpty} photo${skippedEmpty>1?'s':''} couldn't be read — try re-picking from camera roll`, true);
+  if (failed) toast(`${failed} photo${failed>1?'s':''} failed: ${lastError}. Try again or pick a smaller file.`, true);
   return urls;
 }
 
@@ -394,8 +413,10 @@ async function signUpExistingModel(username, pin) {
     const u = await uploadFiles([profInput.files[0]], nameVal, 'profile');
     if (u.length) profileUrl = u[0];
   }
+  if (!profileUrl) { showError('signup-error','Your profile photo failed to upload. Please try again with a different photo (under 50MB).'); return; }
   // Fit / hair / mua / outfit / current hair (max 3 each)
   const faceUrls    = await uploadFiles(chosenFiles('ex-face'),         nameVal, 'face', 1);
+  if (!faceUrls.length) { showError('signup-error','Your face close-up failed to upload. Please try again with a different photo (under 50MB).'); return; }
   const fitUrls     = await uploadFiles(chosenFiles('ex-fit'),          nameVal, 'fit', 3);
   const hairUrls    = await uploadFiles(chosenFiles('ex-hair'),         nameVal, 'hair', 3);
   const muaUrls     = await uploadFiles(chosenFiles('ex-mua'),          nameVal, 'mua', 3);
@@ -468,7 +489,9 @@ async function signUpNewModel(username, pin) {
     const u = await uploadFiles([profInput.files[0]], folder, 'profile');
     if (u.length) profileUrl = u[0];
   }
+  if (!profileUrl) { showError('signup-error','Your profile photo failed to upload. Please try again with a different photo (under 50MB).'); return; }
   const faceUrls    = await uploadFiles(chosenFiles('new-face1'),       folder, 'face', 1);
+  if (!faceUrls.length) { showError('signup-error','Your face close-up failed to upload. Please try again with a different photo (under 50MB).'); return; }
   const fitUrls     = await uploadFiles(chosenFiles('new-fit'),         folder, 'fit', 3);
   const hairUrls    = await uploadFiles(chosenFiles('new-hair-photos'), folder, 'hair', 3);
   const muaUrls     = await uploadFiles(chosenFiles('new-mua-photos'),  folder, 'mua', 3);
