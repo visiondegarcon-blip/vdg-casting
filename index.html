@@ -893,40 +893,32 @@
         <div id="staff-inventory-content" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:8px;flex-wrap:wrap">
             <span class="dim-text" id="staff-inv-count">0 items</span>
-            <div style="display:flex;gap:8px;position:relative">
-              <button class="btn btn-sm btn-ghost" style="width:auto" onclick="toggleInvFilterPanel('staff')">⚲ Filter</button>
-              <button class="btn btn-sm btn-brown" style="width:auto" onclick="openInvModal()">+ Add Item</button>
-              <div class="inv-filter-panel hidden" id="staff-inv-filter-panel">
-                <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-                  <span class="toggle-label" style="font-size:12px;text-transform:none;letter-spacing:.02em">Staff Uploaded Only</span>
-                  <label class="toggle-switch">
-                    <input type="checkbox" id="staff-filter-staff" onchange="updateInvFilter('staff-inv-grid','staff-inv-count',false,'staffOnly',this.checked)"/>
-                    <span class="toggle-slider"></span>
-                  </label>
-                </div>
-                <div class="form-group">
-                  <label>Category</label>
-                  <div class="select-wrap">
-                    <select id="staff-filter-cat" onchange="updateInvFilter('staff-inv-grid','staff-inv-count',false,'category',this.value)">
-                      <option value="">All Categories</option>
-                      <option value="Top">Top</option>
-                      <option value="Bottom">Bottom</option>
-                      <option value="Outerwear">Outerwear</option>
-                      <option value="Accessory">Accessory</option>
-                      <option value="Shoes">Shoes</option>
-                      <option value="Full Look">Full Look</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <label>Size contains</label>
-                  <input id="staff-filter-size" placeholder="e.g. S, 32" oninput="updateInvFilter('staff-inv-grid','staff-inv-count',false,'size',this.value)"/>
-                </div>
-                <button class="btn btn-sm btn-ghost" onclick="clearInvFilters('staff-inv-grid','staff-inv-count',false,'staff')">Clear Filters</button>
+            <button class="btn btn-sm btn-brown" style="width:auto" onclick="openInvModal()">+ Add Item</button>
+          </div>
+          <div class="inv-section inv-section--staff">
+            <div class="inv-section-header open" onclick="toggleInvSection(this)">
+              <span class="inv-section-title">Staff Uploaded</span>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span class="inv-section-count" id="staff-inv-staff-count">0</span>
+                <span class="inv-section-arrow">▼</span>
               </div>
             </div>
+            <div class="inv-section-body">
+              <div class="inv-grid" id="staff-inv-staff-grid"></div>
+            </div>
           </div>
-          <div class="inv-grid" id="staff-inv-grid"></div>
+          <div class="inv-section inv-section--model">
+            <div class="inv-section-header open" onclick="toggleInvSection(this)">
+              <span class="inv-section-title">Model's Foundation Outfit</span>
+              <div style="display:flex;align-items:center;gap:10px">
+                <span class="inv-section-count" id="staff-inv-model-count">0</span>
+                <span class="inv-section-arrow">▼</span>
+              </div>
+            </div>
+            <div class="inv-section-body">
+              <div class="inv-grid" id="staff-inv-model-grid"></div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
@@ -1359,6 +1351,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

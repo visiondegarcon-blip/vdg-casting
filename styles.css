@@ -282,7 +282,7 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 .main-content { margin-left: var(--sidebar); flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
 .topbar { padding: 16px 28px; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--white); z-index: 50; gap: 16px; border-radius: 0; }
 .topbar-title { font-family: var(--font-display); font-size: 28px; letter-spacing: .05em; font-weight: 400; color: var(--black); white-space: nowrap; }
-.topbar-actions { flex: 1; display: flex; justify-content: flex-end; }
+.topbar-actions { flex: 1; display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; }
 .search-input { max-width: 260px; margin-top: 0; background: var(--surface); }
 .panel-content { padding: 24px 28px; flex: 1; }
 
@@ -415,6 +415,22 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 .inv-filter-panel .form-group { margin-bottom: 12px; }
 .inv-filter-panel .form-group:last-of-type { margin-bottom: 14px; }
 
+/* ── INVENTORY DROPDOWN SECTIONS (staff view) ── */
+.inv-section { margin-bottom: 16px; border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.inv-section-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; cursor: pointer; user-select: none; transition: background .2s; }
+.inv-section-header:hover { background: var(--cream); }
+.inv-section-header .inv-section-title { font-family: var(--font-mono); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.inv-section-header .inv-section-count { font-size: 12px; color: var(--dim); font-family: var(--font-mono); }
+.inv-section-header .inv-section-arrow { font-size: 14px; color: var(--dim); transition: transform .2s; }
+.inv-section-header.open .inv-section-arrow { transform: rotate(180deg); }
+.inv-section-body { padding: 0 14px 14px; }
+.inv-section-body.collapsed { display: none; }
+.inv-section--staff .inv-section-title { color: #2d8a4e; }
+.inv-section--model .inv-section-title { color: var(--brown); }
+.inv-card-source { font-size: 10px; font-family: var(--font-mono); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; margin-top: 4px; }
+.inv-card-source.staff { color: #2d8a4e; }
+.inv-card-source.model { color: var(--brown); }
+
 /* ── MODAL ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(17,17,16,.5); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(6px); }
 .modal { background: var(--white); border: 1.5px solid var(--border); width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; border-radius: var(--radius-lg); box-shadow: 0 24px 80px rgba(0,0,0,.2); }
@@ -485,7 +501,10 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   .model-panel { max-width: 100%; max-height: 92vh; }
   .detail-grid { grid-template-columns: 1fr; }
   .assign-grid { grid-template-columns: 1fr; }
-  .topbar { padding: 12px 16px; }
+  .topbar { padding: 12px 16px; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .topbar-actions { gap: 6px; flex-wrap: wrap; justify-content: flex-start; width: 100%; }
+  .topbar-actions .btn { font-size: 11px; padding: 7px 10px; }
+  .topbar-actions .search-input { width: 100%; }
   .model-profile-body { padding: 20px; }
   .model-profile-hero { padding: 28px 20px; }
   .auth-card { padding: 36px 28px; }

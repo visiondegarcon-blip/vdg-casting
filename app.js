@@ -977,7 +977,7 @@ async function assignInventoryToModel(itemId, modelName, panelModelId) {
   if (item) item.assigned_model = modelName;
   toast(modelName ? `Added to ${modelName.split(' ')[0]}'s stage fit` : 'Removed from stage fit');
   if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
-  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
   if (panelModelId) await openModelPanel(panelModelId);
 }
 async function toggleApprove(id) {
@@ -1494,7 +1494,7 @@ async function setStaffTab(btn, tab) {
     modelsContent.classList.add('hidden');
     invContent.classList.remove('hidden');
     await loadInventory();
-    renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+    renderStaffInventory();
   } else {
     modelsContent.classList.remove('hidden');
     invContent.classList.add('hidden');
@@ -1587,6 +1587,27 @@ function clearInvFilters(gridId, countId, isAdmin, prefix) {
 function toggleInvFilterPanel(prefix) {
   document.getElementById(prefix+'-inv-filter-panel')?.classList.toggle('hidden');
 }
+function toggleInvSection(header) {
+  header.classList.toggle('open');
+  const body = header.nextElementSibling;
+  if (body) body.classList.toggle('collapsed');
+}
+function renderInvCard(item) {
+  const srcLabel = item.staff_uploaded
+    ? `<div class="inv-card-source staff">${item.uploaded_by ? 'Staff: '+item.uploaded_by : 'Staff Uploaded'}</div>`
+    : `<div class="inv-card-source model">Model Uploaded</div>`;
+  return `<div class="inv-card" onclick="openInventoryPanel('${item.id}')" style="cursor:pointer">
+    ${item.photo_url
+      ? `<div class="inv-card-photo"><img src="${item.photo_url}" onerror="this.parentElement.innerHTML='👕'" alt=""/></div>`
+      : `<div class="inv-card-no-photo">👕</div>`}
+    <div class="inv-card-name"${item.staff_uploaded?' style="color:#2d8a4e"':''}>${item.name||item.category||'Unnamed'}</div>
+    <div class="inv-card-meta">${item.category||''}${item.size_qty?' · '+item.size_qty:''}</div>
+    ${item.assigned_model
+      ? `<div class="inv-assigned">→ ${item.assigned_model}</div>`
+      : `<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
+    ${srcLabel}
+  </div>`;
+}
 function renderInventoryGrid(gridId, countId, isAdmin) {
   const items = applyInvFilters(inventoryData, gridId);
   const count=document.getElementById(countId);
@@ -1594,19 +1615,27 @@ function renderInventoryGrid(gridId, countId, isAdmin) {
   const grid=document.getElementById(gridId);
   if (!grid) return;
   grid.innerHTML = items.length
-    ? items.map(item=>`
-        <div class="inv-card" onclick="openInventoryPanel('${item.id}')" style="cursor:pointer">
-          ${item.photo_url
-            ? `<div class="inv-card-photo"><img src="${item.photo_url}" onerror="this.parentElement.innerHTML='👕'" alt=""/></div>`
-            : `<div class="inv-card-no-photo">👕</div>`}
-          <div class="inv-card-name">${item.name||item.category||'Unnamed'}</div>
-          <div class="inv-card-meta">${item.category||''}${item.size_qty?' · '+item.size_qty:''}</div>
-          ${item.assigned_model
-            ? `<div class="inv-assigned">→ ${item.assigned_model}</div>`
-            : `<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
-          ${item.staff_uploaded ? `<div class="badge badge-blue" style="margin-top:6px;display:inline-block">Staff Uploaded</div>` : ''}
-        </div>`).join('')
+    ? items.map(item=>renderInvCard(item)).join('')
     : `<div class="loading-center" style="background:var(--white);grid-column:1/-1;padding:40px;border-radius:var(--radius)">${inventoryData.length ? 'No items match these filters' : 'No items yet'}</div>`;
+}
+function renderStaffInventory() {
+  const staffItems = inventoryData.filter(i=>i.staff_uploaded);
+  const modelItems = inventoryData.filter(i=>!i.staff_uploaded);
+  const total = inventoryData.length;
+  const countEl = document.getElementById('staff-inv-count');
+  if (countEl) countEl.textContent = total + ' items';
+  const staffGrid = document.getElementById('staff-inv-staff-grid');
+  const modelGrid = document.getElementById('staff-inv-model-grid');
+  const staffCount = document.getElementById('staff-inv-staff-count');
+  const modelCount = document.getElementById('staff-inv-model-count');
+  if (staffCount) staffCount.textContent = staffItems.length;
+  if (modelCount) modelCount.textContent = modelItems.length;
+  if (staffGrid) staffGrid.innerHTML = staffItems.length
+    ? staffItems.map(i=>renderInvCard(i)).join('')
+    : '<div style="padding:20px;color:var(--dim);font-size:12px;font-family:var(--font-mono);text-align:center">No staff uploaded items yet</div>';
+  if (modelGrid) modelGrid.innerHTML = modelItems.length
+    ? modelItems.map(i=>renderInvCard(i)).join('')
+    : '<div style="padding:20px;color:var(--dim);font-size:12px;font-family:var(--font-mono);text-align:center">No model items yet</div>';
 }
 
 function openInventoryPanel(itemId) {
@@ -1682,7 +1711,7 @@ async function updateInvItem(itemId) {
 
   await loadInventory();
   if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
-  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
 }
 
 function openInvModal() {
@@ -1723,14 +1752,16 @@ async function saveInvItem() {
     if (u.length) photoUrl=u[0];
   }
   if (!nameVal && !photoUrl) { toast('Add a photo or name',true); return; }
-  const staffUploaded = document.getElementById('inv-staff-uploaded').checked;
-  const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,staff_uploaded:staffUploaded});
+  const isStaff = currentUser && currentUser.role !== 'ADMIN' && currentUser.role !== 'MODEL';
+  const staffUploaded = isStaff ? true : document.getElementById('inv-staff-uploaded').checked;
+  const uploadedBy = isStaff ? (currentUser.name||'') : '';
+  const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,staff_uploaded:staffUploaded,uploaded_by:uploadedBy});
   if (error) { toast('Error: '+error.message,true); return; }
   toast('Item added ✓');
   document.getElementById('inv-modal-overlay').classList.add('hidden');
   await loadInventory();
   if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
-  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
 }
 
 // ═══════════════════════════════════════════════
@@ -1748,7 +1779,7 @@ async function deleteInvItem(itemId) {
   if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
   await loadInventory();
   if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
-  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderInventoryGrid('staff-inv-grid','staff-inv-count',false);
+  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
 }
 
 // ═══════════════════════════════════════════════
