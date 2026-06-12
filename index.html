@@ -656,6 +656,19 @@
                 <label>Music Link <span style="color:var(--dim)">(YouTube, SoundCloud, Dropbox, etc.)</span></label>
                 <input type="url" id="cr-music-link" placeholder="https://..." autocapitalize="none"/>
               </div>
+              <div style="margin-top:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--black)">
+                <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase">MEDIA</div>
+                <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Optional — up to 5 photos or videos you'd like playing in the background during your performance</div>
+              </div>
+              <div class="form-group">
+                <label>Upload Media <span style="color:var(--dim)">(images or videos, up to 5)</span></label>
+                <div class="upload-zone" onclick="document.getElementById('cr-media').click()">
+                  <input type="file" id="cr-media" multiple accept="image/*,video/*" style="display:none" onchange="pickFiles('cr-media',5)"/>
+                  <div class="upload-zone-icon">🎬</div>
+                  <div class="upload-zone-text">Tap to add background photos/videos</div>
+                </div>
+                <div class="file-previews" id="cr-media-previews"></div>
+              </div>
             </div>
           </div>
 
@@ -714,6 +727,12 @@
 
   <!-- ADMIN DASHBOARD -->
   <section id="admin-dashboard" class="dashboard hidden">
+    <div class="admin-mob-topbar">
+      <button class="hamburger-btn" onclick="toggleAdminSidebar()" aria-label="Menu">☰</button>
+      <div class="mob-logo">VDG</div>
+      <div style="width:36px"></div>
+    </div>
+    <div class="sidebar-backdrop" id="admin-sidebar-backdrop" onclick="closeAdminSidebar()"></div>
     <div class="sidebar">
       <div class="sidebar-logo">VDG</div>
       <div class="sidebar-event">Brisbane — Jul 5</div>
@@ -753,9 +772,40 @@
           <div class="model-grid" id="admin-model-grid"></div>
         </div>
         <div id="inventory-tab-content" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:8px;flex-wrap:wrap">
             <span class="dim-text" id="inv-count">0 items</span>
-            <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+            <div style="display:flex;gap:8px;position:relative">
+              <button class="btn btn-sm btn-ghost" style="width:auto" onclick="toggleInvFilterPanel('admin')">⚲ Filter</button>
+              <button class="btn btn-sm btn-brown" style="width:auto" onclick="openInvModal()">+ Add Item</button>
+              <div class="inv-filter-panel hidden" id="admin-inv-filter-panel">
+                <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span class="toggle-label" style="font-size:12px;text-transform:none;letter-spacing:.02em">Staff Uploaded Only</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="admin-filter-staff" onchange="updateInvFilter('inv-grid','inv-count',true,'staffOnly',this.checked)"/>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>Category</label>
+                  <div class="select-wrap">
+                    <select id="admin-filter-cat" onchange="updateInvFilter('inv-grid','inv-count',true,'category',this.value)">
+                      <option value="">All Categories</option>
+                      <option value="Top">Top</option>
+                      <option value="Bottom">Bottom</option>
+                      <option value="Outerwear">Outerwear</option>
+                      <option value="Accessory">Accessory</option>
+                      <option value="Shoes">Shoes</option>
+                      <option value="Full Look">Full Look</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Size contains</label>
+                  <input id="admin-filter-size" placeholder="e.g. S, 32" oninput="updateInvFilter('inv-grid','inv-count',true,'size',this.value)"/>
+                </div>
+                <button class="btn btn-sm btn-ghost" onclick="clearInvFilters('inv-grid','inv-count',true,'admin')">Clear Filters</button>
+              </div>
+            </div>
           </div>
           <div class="inv-grid" id="inv-grid"></div>
         </div>
@@ -841,9 +891,40 @@
           <div class="model-grid" id="staff-model-grid"></div>
         </div>
         <div id="staff-inventory-content" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:8px;flex-wrap:wrap">
             <span class="dim-text" id="staff-inv-count">0 items</span>
-            <button class="btn btn-sm btn-brown" onclick="openInvModal()">+ Add Item</button>
+            <div style="display:flex;gap:8px;position:relative">
+              <button class="btn btn-sm btn-ghost" style="width:auto" onclick="toggleInvFilterPanel('staff')">⚲ Filter</button>
+              <button class="btn btn-sm btn-brown" style="width:auto" onclick="openInvModal()">+ Add Item</button>
+              <div class="inv-filter-panel hidden" id="staff-inv-filter-panel">
+                <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+                  <span class="toggle-label" style="font-size:12px;text-transform:none;letter-spacing:.02em">Staff Uploaded Only</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="staff-filter-staff" onchange="updateInvFilter('staff-inv-grid','staff-inv-count',false,'staffOnly',this.checked)"/>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label>Category</label>
+                  <div class="select-wrap">
+                    <select id="staff-filter-cat" onchange="updateInvFilter('staff-inv-grid','staff-inv-count',false,'category',this.value)">
+                      <option value="">All Categories</option>
+                      <option value="Top">Top</option>
+                      <option value="Bottom">Bottom</option>
+                      <option value="Outerwear">Outerwear</option>
+                      <option value="Accessory">Accessory</option>
+                      <option value="Shoes">Shoes</option>
+                      <option value="Full Look">Full Look</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Size contains</label>
+                  <input id="staff-filter-size" placeholder="e.g. S, 32" oninput="updateInvFilter('staff-inv-grid','staff-inv-count',false,'size',this.value)"/>
+                </div>
+                <button class="btn btn-sm btn-ghost" onclick="clearInvFilters('staff-inv-grid','staff-inv-count',false,'staff')">Clear Filters</button>
+              </div>
+            </div>
           </div>
           <div class="inv-grid" id="staff-inv-grid"></div>
         </div>
@@ -919,6 +1000,13 @@
           <div class="select-wrap">
             <select id="inv-model-assign"><option value="">Unassigned</option></select>
           </div>
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--cream);padding:10px 14px;border-radius:var(--radius-sm);border:1.5px solid var(--border)">
+          <span class="toggle-label" style="font-size:12px;text-transform:none;letter-spacing:.02em">Uploaded by Staff</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="inv-staff-uploaded"/>
+            <span class="toggle-slider"></span>
+          </label>
         </div>
         <button class="btn btn-brown" onclick="saveInvItem()">Save Item</button>
         <button class="btn btn-danger hidden" id="inv-delete-btn" onclick="deleteInvItem()">Delete Item</button>
@@ -1271,6 +1359,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

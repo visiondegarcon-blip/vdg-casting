@@ -134,7 +134,10 @@ function renderPendingPreviews(inputId, max) {
   const arr = pendingFiles[inputId] || [];
   wrap.innerHTML = arr.map((f, i) => {
     const url = URL.createObjectURL(f);
-    return `<div class="file-chip"><img src="${url}" alt=""/><button type="button" class="file-chip-x" onclick="event.stopPropagation();removePendingFile('${inputId}',${i},${max||0})">×</button></div>`;
+    const media = f.type && f.type.startsWith('video/')
+      ? `<video src="${url}" muted></video>`
+      : `<img src="${url}" alt=""/>`;
+    return `<div class="file-chip">${media}<button type="button" class="file-chip-x" onclick="event.stopPropagation();removePendingFile('${inputId}',${i},${max||0})">×</button></div>`;
   }).join('');
 }
 
@@ -636,7 +639,17 @@ async function showAdminDashboard() {
   renderAdminModels();
 }
 
+function toggleAdminSidebar() {
+  document.querySelector('#admin-dashboard .sidebar')?.classList.toggle('open');
+  document.getElementById('admin-sidebar-backdrop')?.classList.toggle('open');
+}
+function closeAdminSidebar() {
+  document.querySelector('#admin-dashboard .sidebar')?.classList.remove('open');
+  document.getElementById('admin-sidebar-backdrop')?.classList.remove('open');
+}
+
 function adminNav(page, btn) {
+  closeAdminSidebar();
   document.querySelectorAll('#admin-dashboard .nav-item').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('admin-models-panel').classList.remove('hidden');
@@ -1544,13 +1557,44 @@ function closeStaffSearch() {
 // ═══════════════════════════════════════════════
 // INVENTORY
 // ═══════════════════════════════════════════════
+const invFilters = {};
+function getInvFilter(gridId) {
+  return invFilters[gridId] || (invFilters[gridId] = { staffOnly:false, category:'', size:'' });
+}
+function applyInvFilters(items, gridId) {
+  const f = getInvFilter(gridId);
+  return items.filter(item => {
+    if (f.staffOnly && !item.staff_uploaded) return false;
+    if (f.category && item.category !== f.category) return false;
+    if (f.size && !(item.size_qty||'').toLowerCase().includes(f.size.toLowerCase())) return false;
+    return true;
+  });
+}
+function updateInvFilter(gridId, countId, isAdmin, key, value) {
+  getInvFilter(gridId)[key] = value;
+  renderInventoryGrid(gridId, countId, isAdmin);
+}
+function clearInvFilters(gridId, countId, isAdmin, prefix) {
+  invFilters[gridId] = { staffOnly:false, category:'', size:'' };
+  const staffCb = document.getElementById(prefix+'-filter-staff');
+  const catSel  = document.getElementById(prefix+'-filter-cat');
+  const sizeIn  = document.getElementById(prefix+'-filter-size');
+  if (staffCb) staffCb.checked = false;
+  if (catSel)  catSel.value = '';
+  if (sizeIn)  sizeIn.value = '';
+  renderInventoryGrid(gridId, countId, isAdmin);
+}
+function toggleInvFilterPanel(prefix) {
+  document.getElementById(prefix+'-inv-filter-panel')?.classList.toggle('hidden');
+}
 function renderInventoryGrid(gridId, countId, isAdmin) {
+  const items = applyInvFilters(inventoryData, gridId);
   const count=document.getElementById(countId);
-  if (count) count.textContent=inventoryData.length+' items';
+  if (count) count.textContent=items.length+' items';
   const grid=document.getElementById(gridId);
   if (!grid) return;
-  grid.innerHTML = inventoryData.length
-    ? inventoryData.map(item=>`
+  grid.innerHTML = items.length
+    ? items.map(item=>`
         <div class="inv-card" onclick="openInventoryPanel('${item.id}')" style="cursor:pointer">
           ${item.photo_url
             ? `<div class="inv-card-photo"><img src="${item.photo_url}" onerror="this.parentElement.innerHTML='👕'" alt=""/></div>`
@@ -1560,8 +1604,9 @@ function renderInventoryGrid(gridId, countId, isAdmin) {
           ${item.assigned_model
             ? `<div class="inv-assigned">→ ${item.assigned_model}</div>`
             : `<div style="font-size:11px;color:var(--dim)">Unassigned</div>`}
+          ${item.staff_uploaded ? `<div class="badge badge-blue" style="margin-top:6px;display:inline-block">Staff Uploaded</div>` : ''}
         </div>`).join('')
-    : `<div class="loading-center" style="background:var(--white);grid-column:1/-1;padding:40px;border-radius:var(--radius)">No items yet</div>`;
+    : `<div class="loading-center" style="background:var(--white);grid-column:1/-1;padding:40px;border-radius:var(--radius)">${inventoryData.length ? 'No items match these filters' : 'No items yet'}</div>`;
 }
 
 function openInventoryPanel(itemId) {
@@ -1572,6 +1617,7 @@ function openInventoryPanel(itemId) {
   document.getElementById('inv-name').value  = item.name||'';
   document.getElementById('inv-size').value  = item.size_qty||'';
   document.getElementById('inv-cat').value   = item.category||'Top';
+  document.getElementById('inv-staff-uploaded').checked = !!item.staff_uploaded;
 
   // Show existing photo
   const preview = document.getElementById('inv-photo-preview');
@@ -1616,7 +1662,8 @@ async function updateInvItem(itemId) {
   const catVal    = document.getElementById('inv-cat').value;
   const assignVal = document.getElementById('inv-model-assign').value;
 
-  const updates = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal };
+  const staffUploaded = document.getElementById('inv-staff-uploaded').checked;
+  const updates = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal, staff_uploaded:staffUploaded };
 
   const photoInput = document.getElementById('inv-photo-input');
   if (photoInput && photoInput.files[0]) {
@@ -1641,6 +1688,7 @@ async function updateInvItem(itemId) {
 function openInvModal() {
   document.getElementById('inv-name').value='';
   document.getElementById('inv-size').value='';
+  document.getElementById('inv-staff-uploaded').checked = currentUser?.role !== 'ADMIN';
   document.getElementById('inv-photo-preview').innerHTML=`
     <input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
     <div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div></div>`;
@@ -1675,7 +1723,8 @@ async function saveInvItem() {
     if (u.length) photoUrl=u[0];
   }
   if (!nameVal && !photoUrl) { toast('Add a photo or name',true); return; }
-  const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl});
+  const staffUploaded = document.getElementById('inv-staff-uploaded').checked;
+  const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,staff_uploaded:staffUploaded});
   if (error) { toast('Error: '+error.message,true); return; }
   toast('Item added ✓');
   document.getElementById('inv-modal-overlay').classList.add('hidden');
@@ -2694,6 +2743,22 @@ async function uploadMusicFile(file, folder) {
   return data.publicUrl;
 }
 
+async function uploadCreativeMedia(files, folder) {
+  const urls = [];
+  for (const file of files) {
+    if (!file || !file.size) continue;
+    if (file.size > 50 * 1024 * 1024) { toast(`${file.name||'A file'} is too large (max 50MB)`, true); continue; }
+    const ext = (file.name||'').split('.').pop().toLowerCase();
+    const path = `${folder}/media/${Date.now()}_${Math.random().toString(36).slice(2,7)}${ext && ext.length<=5 ? '.'+ext : ''}`;
+    const contentType = file.type || 'application/octet-stream';
+    const { error } = await sb.storage.from('creative-files').upload(path, file, { upsert: true, contentType });
+    if (error) { console.error('Media upload error:', error); toast(`Failed to upload ${file.name||'a file'}`, true); continue; }
+    const { data } = sb.storage.from('creative-files').getPublicUrl(path);
+    urls.push(data.publicUrl);
+  }
+  return urls;
+}
+
 async function uploadCreativePhoto(file, folder) {
   if (!file || !file.size) return '';
   const path = `${folder}/profile/${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
@@ -2739,10 +2804,12 @@ async function signUpExistingCreative(username, pin, crType, profileFile, musicF
   const profileUrl = await uploadCreativePhoto(profileFile, folder);
   let musicFileUrl = '';
   if (musicFile) musicFileUrl = await uploadMusicFile(musicFile, folder);
+  const mediaUrls = await uploadCreativeMedia(chosenFiles('cr-media'), folder);
 
   const updates = { username, pin, registered: true, creative_type: crType, profile_photo: profileUrl };
   if (musicFileUrl) updates.music_file_url = musicFileUrl;
   if (musicLink) updates.music_link = musicLink;
+  if (mediaUrls.length) updates.media_urls = mediaUrls;
 
   const { error } = await sb.from('creative_profiles').update(updates).eq('id', nameVal);
   if (error) { showError('signup-error', error.message); return; }
@@ -2771,6 +2838,7 @@ async function signUpNewCreative(username, pin, crType, profileFile, musicFile, 
   const profileUrl = await uploadCreativePhoto(profileFile, folder);
   let musicFileUrl = '';
   if (musicFile) musicFileUrl = await uploadMusicFile(musicFile, folder);
+  const mediaUrls = await uploadCreativeMedia(chosenFiles('cr-media'), folder);
 
   const payload = {
     full_name: fullName,
@@ -2789,6 +2857,7 @@ async function signUpNewCreative(username, pin, crType, profileFile, musicFile, 
     profile_photo: profileUrl,
     music_file_url: musicFileUrl,
     music_link: musicLink,
+    media_urls: mediaUrls,
     username, pin, registered: true,
     tags: [], notes: ''
   };
@@ -2870,6 +2939,16 @@ async function openCreativePanel(id) {
 
   const detail = (label, val) => val ? `<div class="detail-item"><span class="detail-label">${label}</span><span class="detail-value">${val}</span></div>` : '';
 
+  const mediaUrls = toArr(c.media_urls);
+  const mediaGrid = mediaUrls.length ? `<div style="margin-bottom:20px">
+    <div class="panel-section-title">Background Media</div>
+    <div class="media-gallery">
+      ${mediaUrls.map(u => /\.(mp4|mov|webm|m4v)$/i.test(u)
+        ? `<video src="${u}" controls preload="metadata"></video>`
+        : `<img src="${u}" alt=""/>`).join('')}
+    </div>
+  </div>` : '';
+
   document.getElementById('cr-panel-body').innerHTML = `
     ${c.profile_photo ? `<div style="text-align:center;margin-bottom:20px"><img src="${c.profile_photo}" style="width:120px;height:120px;object-fit:cover;border-radius:50%;border:3px solid var(--beige)"/></div>` : ''}
 
@@ -2882,6 +2961,8 @@ async function openCreativePanel(id) {
       <div class="panel-section-title">Music</div>
       ${musicSection.join('')}
     </div>` : ''}
+
+    ${mediaGrid}
 
     <div style="margin-bottom:20px">
       <div class="panel-section-title">Details</div>
@@ -2993,6 +3074,16 @@ function showCreativeDashboard(c) {
     </div>`);
   }
 
+  const mediaUrls = toArr(c.media_urls);
+  const mediaSection = mediaUrls.length ? `<div class="model-section">
+    <div class="model-section-title">Your Background Media</div>
+    <div class="media-gallery">
+      ${mediaUrls.map(u => /\.(mp4|mov|webm|m4v)$/i.test(u)
+        ? `<video src="${u}" controls preload="metadata"></video>`
+        : `<img src="${u}" alt=""/>`).join('')}
+    </div>
+  </div>` : '';
+
   wrap.innerHTML = `
     <div class="model-profile-card">
       <div style="text-align:center;margin-bottom:16px">
@@ -3011,6 +3102,8 @@ function showCreativeDashboard(c) {
         <div class="model-section-title">Your Music</div>
         ${musicSection.join('')}
       </div>` : ''}
+
+      ${mediaSection}
 
       <div class="model-section">
         <div class="model-section-title">Your Details</div>
