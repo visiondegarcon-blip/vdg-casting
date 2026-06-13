@@ -1557,6 +1557,7 @@ function closeStaffSearch() {
 // ═══════════════════════════════════════════════
 // INVENTORY
 // ═══════════════════════════════════════════════
+let invSaving = false;
 const invFilters = {};
 function getInvFilter(gridId) {
   return invFilters[gridId] || (invFilters[gridId] = { staffOnly:false, category:'', size:'' });
@@ -1686,32 +1687,38 @@ function openInventoryPanel(itemId) {
 }
 
 async function updateInvItem(itemId) {
-  const nameVal   = document.getElementById('inv-name').value.trim();
-  const sizeVal   = document.getElementById('inv-size').value.trim();
-  const catVal    = document.getElementById('inv-cat').value;
-  const assignVal = document.getElementById('inv-model-assign').value;
-
-  const staffUploaded = document.getElementById('inv-staff-uploaded').checked;
-  const updates = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal, staff_uploaded:staffUploaded };
-
-  const photoInput = document.getElementById('inv-photo-input');
-  if (photoInput && photoInput.files[0]) {
-    const u = await uploadFiles([photoInput.files[0]],'inventory','items',1);
-    if (u.length) updates.photo_url = u[0];
-  }
-
-  const { error } = await sb.from('inventory').update(updates).eq('id',itemId);
-  if (error) { toast('Error: '+error.message,true); return; }
-  toast('Saved ✓');
-  document.getElementById('inv-modal-overlay').classList.add('hidden');
-
-  // reset save button back to "Add Item" for next new item
+  if (invSaving) return;
   const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
-  if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
+  const originalLabel = saveBtn ? saveBtn.textContent : '';
+  invSaving = true;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+  try {
+    const nameVal   = document.getElementById('inv-name').value.trim();
+    const sizeVal   = document.getElementById('inv-size').value.trim();
+    const catVal    = document.getElementById('inv-cat').value;
+    const assignVal = document.getElementById('inv-model-assign').value;
 
-  await loadInventory();
-  if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
-  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
+    const staffUploaded = document.getElementById('inv-staff-uploaded').checked;
+    const updates = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal, staff_uploaded:staffUploaded };
+
+    const photoInput = document.getElementById('inv-photo-input');
+    if (photoInput && photoInput.files[0]) {
+      const u = await uploadFiles([photoInput.files[0]],'inventory','items',1);
+      if (u.length) updates.photo_url = u[0];
+    }
+
+    const { error } = await sb.from('inventory').update(updates).eq('id',itemId);
+    if (error) { toast('Error: '+error.message,true); return; }
+    toast('Saved ✓');
+    document.getElementById('inv-modal-overlay').classList.add('hidden');
+
+    await loadInventory();
+    if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
+    if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
+  } finally {
+    invSaving = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
+  }
 }
 
 function openInvModal() {
@@ -1741,27 +1748,37 @@ function openInvModal() {
 function closeInvModal(e) { if (e.target.id==='inv-modal-overlay') document.getElementById('inv-modal-overlay').classList.add('hidden'); }
 
 async function saveInvItem() {
-  const nameVal=document.getElementById('inv-name').value.trim();
-  const sizeVal=document.getElementById('inv-size').value.trim();
-  const catVal=document.getElementById('inv-cat').value;
-  const assignVal=document.getElementById('inv-model-assign').value;
-  const photoInput=document.getElementById('inv-photo-input');
-  let photoUrl='';
-  if (photoInput && photoInput.files[0]) {
-    const u=await uploadFiles([photoInput.files[0]],'inventory','items');
-    if (u.length) photoUrl=u[0];
+  if (invSaving) return;
+  const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
+  const originalLabel = saveBtn ? saveBtn.textContent : '';
+  invSaving = true;
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+  try {
+    const nameVal=document.getElementById('inv-name').value.trim();
+    const sizeVal=document.getElementById('inv-size').value.trim();
+    const catVal=document.getElementById('inv-cat').value;
+    const assignVal=document.getElementById('inv-model-assign').value;
+    const photoInput=document.getElementById('inv-photo-input');
+    let photoUrl='';
+    if (photoInput && photoInput.files[0]) {
+      const u=await uploadFiles([photoInput.files[0]],'inventory','items');
+      if (u.length) photoUrl=u[0];
+    }
+    if (!nameVal && !photoUrl) { toast('Add a photo or name',true); return; }
+    const isStaff = currentUser && currentUser.role !== 'ADMIN' && currentUser.role !== 'MODEL';
+    const staffUploaded = isStaff ? true : document.getElementById('inv-staff-uploaded').checked;
+    const uploadedBy = isStaff ? (currentUser.name||'') : '';
+    const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,staff_uploaded:staffUploaded,uploaded_by:uploadedBy});
+    if (error) { toast('Error: '+error.message,true); return; }
+    toast('Item added ✓');
+    document.getElementById('inv-modal-overlay').classList.add('hidden');
+    await loadInventory();
+    if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
+    if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
+  } finally {
+    invSaving = false;
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalLabel; }
   }
-  if (!nameVal && !photoUrl) { toast('Add a photo or name',true); return; }
-  const isStaff = currentUser && currentUser.role !== 'ADMIN' && currentUser.role !== 'MODEL';
-  const staffUploaded = isStaff ? true : document.getElementById('inv-staff-uploaded').checked;
-  const uploadedBy = isStaff ? (currentUser.name||'') : '';
-  const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,staff_uploaded:staffUploaded,uploaded_by:uploadedBy});
-  if (error) { toast('Error: '+error.message,true); return; }
-  toast('Item added ✓');
-  document.getElementById('inv-modal-overlay').classList.add('hidden');
-  await loadInventory();
-  if (!document.getElementById('inventory-tab-content')?.classList.contains('hidden')) renderInventoryGrid('inv-grid','inv-count',true);
-  if (!document.getElementById('staff-inventory-content')?.classList.contains('hidden')) renderStaffInventory();
 }
 
 // ═══════════════════════════════════════════════

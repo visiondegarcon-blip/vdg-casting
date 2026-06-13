@@ -101,6 +101,7 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 }
 .btn:hover { opacity: .8; }
 .btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 .btn-brown { background: var(--brown); }
 .btn-brown:hover { opacity: .85; }
 .btn-blue { background: #2563eb; color: var(--white); border-color: #2563eb; }
@@ -761,7 +762,7 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
 
 .tracker-detail-header-switch { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .toggle-label { font-size: 11px; font-family: var(--font-mono); color: var(--dim); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
-.toggle-switch { display: flex; align-items: center; position: relative; cursor: pointer; height: 22px; }
+.toggle-switch { display: flex; align-items: center; position: relative; cursor: pointer; height: 22px; width: 34px; flex-shrink: 0; }
 .toggle-switch input { display: none; }
 .toggle-slider { position: absolute; top: 2px; left: 0; width: 34px; height: 18px; background: #d1d5db; border-radius: 9px; transition: background .2s; }
 .toggle-switch input:checked + .toggle-slider { background: #1a6640; }
