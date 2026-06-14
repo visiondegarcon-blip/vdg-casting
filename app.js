@@ -800,7 +800,7 @@ function renderSignedUpPanel() {
     </div>` : '';
 
   panel.innerHTML = `
-    <div class="collapse-section open" style="margin-bottom:24px">
+    <div class="collapse-section" style="margin-bottom:24px">
       <button class="collapse-btn" onclick="toggleCollapse(this)">
         📋 Sign Up Tracker
         <span style="font-size:10px;font-family:var(--font-mono);opacity:.7;margin-left:6px;font-weight:400;text-transform:none;letter-spacing:0">${completed.length} done · ${notYet.length} pending</span>
