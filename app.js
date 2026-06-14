@@ -1727,6 +1727,23 @@ async function rotateInvPhoto(ev) {
   }
 }
 
+// Downscale an image (blob or data URL) to a max dimension via canvas, to keep
+// the on-device ML model within mobile memory limits.
+async function downscaleImage(src, maxDim) {
+  const img = await loadImg(src);
+  const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+  if (scale >= 1) {
+    const r = await fetch(src);
+    return r.blob();
+  }
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.naturalWidth * scale);
+  c.height = Math.round(img.naturalHeight * scale);
+  const ctx = c.getContext('2d');
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  return new Promise(r => c.toBlob(r, 'image/png'));
+}
+
 // Remove the background of the current photo entirely in-browser.
 async function removeInvPhotoBg(ev) {
   if (ev) ev.stopPropagation();
@@ -1741,7 +1758,10 @@ async function removeInvPhotoBg(ev) {
       _bgRemover = mod.removeBackground || (mod.default && mod.default.removeBackground) || mod.default;
     }
     if (typeof _bgRemover !== 'function') throw new Error('library load failed');
-    const out = await _bgRemover(p.blob || p.src);
+    // Phone camera photos can be huge (12MP+); downscale first so the WASM
+    // model doesn't run out of memory on mobile Safari.
+    const input = await downscaleImage(p.src, 1280);
+    const out = await _bgRemover(input, { model: 'small' });
     const src = await blobToDataURL(out);
     invPhotos[invPhotoIdx] = { src, blob: new File([out], 'photo.png', { type: 'image/png' }), remote: false };
     renderInvGallery();
@@ -1751,7 +1771,7 @@ async function removeInvPhotoBg(ev) {
     toast('Background removal unavailable right now — photo kept as-is', true);
   } finally {
     const b = document.getElementById('inv-bg-btn');
-    if (b) { b.disabled = false; b.textContent = '✨ BG'; }
+    if (b) { b.disabled = false; b.textContent = '✨ Remove BG'; }
   }
 }
 
@@ -1915,7 +1935,7 @@ function renderInvGallery() {
     ${arrows}
     <button type="button" class="inv-gal-del" title="Remove this photo" onclick="removeInvPhotoAt(${invPhotoIdx}, event)">✕</button>
     <div class="inv-gal-tools">
-      <button type="button" class="inv-gal-tool" title="Rotate 90°" onclick="rotateInvPhoto(event)">↻</button>
+      <button type="button" class="inv-gal-tool" title="Rotate 90°" onclick="rotateInvPhoto(event)">↻ Rotate</button>
       <button type="button" class="inv-gal-tool" title="Crop" onclick="openInvCrop(event)">⬚ Crop</button>
       <button type="button" class="inv-gal-tool" id="inv-bg-btn" title="Remove background" onclick="removeInvPhotoBg(event)">✨ Remove BG</button>
     </div>`;
