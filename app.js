@@ -172,12 +172,8 @@ function previewProfile(input) {
   r.onload = e => { const p=document.getElementById('profile-preview'); p.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`; p.appendChild(input); };
   r.readAsDataURL(file);
 }
-function previewInvPhoto(input) {
-  const file = input.files[0]; if (!file) return;
-  const r = new FileReader();
-  r.onload = e => { const p=document.getElementById('inv-photo-preview'); p.innerHTML=`<img src="${e.target.result}" alt=""/>`; p.appendChild(input); };
-  r.readAsDataURL(file);
-}
+// Inventory photo handling now lives in the multi-photo gallery engine
+// (see "INVENTORY PHOTO GALLERY" section near the inventory functions).
 
 // Toggle hair length button selection
 function selectHairLength(groupId, val, btn) {
@@ -459,7 +455,7 @@ async function signUpExistingModel(username, pin) {
 
 // Auto-add a model's "own outfit" signup photos as assigned inventory items under their name
 async function addOutfitsToInventory(urls, modelName) {
-  const rows = urls.map((url,i)=>({ name:`${modelName} – Own Outfit ${i+1}`, category:'Own Outfit', size_qty:'', assigned_model:modelName, photo_url:url }));
+  const rows = urls.map((url,i)=>({ name:`${modelName} – Own Outfit ${i+1}`, category:'Own Outfit', size_qty:'', assigned_model:modelName, photo_url:url, photo_urls:[url] }));
   await sb.from('inventory').insert(rows);
 }
 
@@ -1599,7 +1595,7 @@ function renderInvCard(item) {
     : `<div class="inv-card-source model">Model Uploaded</div>`;
   return `<div class="inv-card" onclick="openInventoryPanel('${item.id}')" style="cursor:pointer">
     ${item.photo_url
-      ? `<div class="inv-card-photo"><img src="${item.photo_url}" onerror="this.parentElement.innerHTML='👕'" alt=""/></div>`
+      ? `<div class="inv-card-photo"><img src="${item.photo_url}" onerror="this.parentElement.innerHTML='👕'" alt=""/>${(Array.isArray(item.photo_urls)&&item.photo_urls.length>1)?`<div class="inv-card-photo-count">📷 ${item.photo_urls.length}</div>`:''}</div>`
       : `<div class="inv-card-no-photo">👕</div>`}
     <div class="inv-card-name"${item.staff_uploaded?' style="color:#2d8a4e"':''}>${item.name||item.category||'Unnamed'}</div>
     <div class="inv-card-meta">${item.category||''}${item.size_qty?' · '+item.size_qty:''}</div>
@@ -1639,6 +1635,182 @@ function renderStaffInventory() {
     : '<div style="padding:20px;color:var(--dim);font-size:12px;font-family:var(--font-mono);text-align:center">No model items yet</div>';
 }
 
+// ═══════════════════════════════════════════════
+// INVENTORY PHOTO GALLERY (multi-photo, rotate, AI bg-remove)
+// ═══════════════════════════════════════════════
+// invPhotos: ordered list the modal edits. Each entry:
+//   { src: dataURL|remoteURL, blob: File|null, remote: bool }
+// photo_urls[0] is treated as the cover (mirrored into photo_url).
+let invPhotos = [];
+let invPhotoIdx = 0;
+let _bgRemover = null; // lazily-imported removeBackground()
+
+function blobToDataURL(blob) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+function loadImg(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+
+function resetInvPhotos() { invPhotos = []; invPhotoIdx = 0; }
+
+async function addInvPhotos(input) {
+  const files = Array.from(input.files || []);
+  input.value = ''; // allow re-picking the same file later
+  for (const f of files) {
+    if (!f || !f.size || !f.type.startsWith('image/')) continue;
+    const src = await blobToDataURL(f);
+    invPhotos.push({ src, blob: f, remote: false });
+  }
+  invPhotoIdx = Math.max(0, invPhotos.length - 1);
+  renderInvGallery();
+}
+
+function invPhotoNav(dir) {
+  if (invPhotos.length < 2) return;
+  invPhotoIdx = (invPhotoIdx + dir + invPhotos.length) % invPhotos.length;
+  renderInvGallery();
+}
+function invPhotoGo(i) { invPhotoIdx = i; renderInvGallery(); }
+function removeInvPhotoAt(i, ev) {
+  if (ev) ev.stopPropagation();
+  invPhotos.splice(i, 1);
+  invPhotoIdx = Math.min(invPhotoIdx, invPhotos.length - 1);
+  if (invPhotoIdx < 0) invPhotoIdx = 0;
+  renderInvGallery();
+}
+
+// Rotate the current photo 90° clockwise via canvas, replacing it in place.
+async function rotateInvPhoto(ev) {
+  if (ev) ev.stopPropagation();
+  const p = invPhotos[invPhotoIdx];
+  if (!p) return;
+  try {
+    // For remote photos, fetch to a blob first so the canvas isn't tainted.
+    let srcForLoad = p.src;
+    let objUrl = null;
+    if (!p.blob) {
+      const r = await fetch(p.src);
+      const b = await r.blob();
+      objUrl = URL.createObjectURL(b);
+      srcForLoad = objUrl;
+    }
+    const img = await loadImg(srcForLoad);
+    const c = document.createElement('canvas');
+    c.width = img.naturalHeight;
+    c.height = img.naturalWidth;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+    if (objUrl) URL.revokeObjectURL(objUrl);
+    const isPng = !!(p.blob && p.blob.type === 'image/png');
+    const type = isPng ? 'image/png' : 'image/jpeg';
+    const blob = await new Promise(r => c.toBlob(r, type, 0.92));
+    const src = await blobToDataURL(blob);
+    invPhotos[invPhotoIdx] = { src, blob: new File([blob], 'photo.' + (isPng ? 'png' : 'jpg'), { type }), remote: false };
+    renderInvGallery();
+  } catch (e) {
+    console.error('rotate failed', e);
+    toast('Could not rotate this photo', true);
+  }
+}
+
+// Remove the background of the current photo entirely in-browser.
+async function removeInvPhotoBg(ev) {
+  if (ev) ev.stopPropagation();
+  const p = invPhotos[invPhotoIdx];
+  if (!p) return;
+  const btn = document.getElementById('inv-bg-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  toast('Removing background — first run downloads the model, please wait');
+  try {
+    if (!_bgRemover) {
+      const mod = await import('https://esm.sh/@imgly/background-removal@1');
+      _bgRemover = mod.removeBackground || (mod.default && mod.default.removeBackground) || mod.default;
+    }
+    if (typeof _bgRemover !== 'function') throw new Error('library load failed');
+    const out = await _bgRemover(p.blob || p.src);
+    const src = await blobToDataURL(out);
+    invPhotos[invPhotoIdx] = { src, blob: new File([out], 'photo.png', { type: 'image/png' }), remote: false };
+    renderInvGallery();
+    toast('Background removed ✓');
+  } catch (e) {
+    console.error('bg removal failed', e);
+    toast('Background removal unavailable right now — photo kept as-is', true);
+  } finally {
+    const b = document.getElementById('inv-bg-btn');
+    if (b) { b.disabled = false; b.textContent = '✨ BG'; }
+  }
+}
+
+// Touch swipe on the main image
+let _invSwipeX = null;
+function invSwipeStart(e) { _invSwipeX = e.changedTouches ? e.changedTouches[0].clientX : null; }
+function invSwipeEnd(e) {
+  if (_invSwipeX == null) return;
+  const x = e.changedTouches ? e.changedTouches[0].clientX : null;
+  if (x != null && Math.abs(x - _invSwipeX) > 40) invPhotoNav(x < _invSwipeX ? 1 : -1);
+  _invSwipeX = null;
+}
+
+function renderInvGallery() {
+  const main = document.getElementById('inv-photo-main');
+  const thumbs = document.getElementById('inv-photo-thumbs');
+  if (!main || !thumbs) return;
+  if (!invPhotos.length) {
+    main.classList.remove('has-photo');
+    main.onclick = () => document.getElementById('inv-photo-input').click();
+    main.ontouchstart = main.ontouchend = null;
+    main.innerHTML = `<div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo(s)</div></div>`;
+    thumbs.innerHTML = '';
+    return;
+  }
+  if (invPhotoIdx >= invPhotos.length) invPhotoIdx = invPhotos.length - 1;
+  const cur = invPhotos[invPhotoIdx];
+  main.classList.add('has-photo');
+  main.onclick = null;
+  main.ontouchstart = invSwipeStart;
+  main.ontouchend = invSwipeEnd;
+  const arrows = invPhotos.length > 1 ? `
+    <button type="button" class="inv-gal-arrow left" onclick="invPhotoNav(-1)">‹</button>
+    <button type="button" class="inv-gal-arrow right" onclick="invPhotoNav(1)">›</button>
+    <div class="inv-gal-counter">${invPhotoIdx + 1} / ${invPhotos.length}</div>` : '';
+  main.innerHTML = `
+    <img src="${cur.src}" alt=""/>
+    ${arrows}
+    <button type="button" class="inv-gal-del" title="Remove this photo" onclick="removeInvPhotoAt(${invPhotoIdx}, event)">✕</button>
+    <div class="inv-gal-tools">
+      <button type="button" class="inv-gal-tool" title="Rotate 90°" onclick="rotateInvPhoto(event)">↻</button>
+      <button type="button" class="inv-gal-tool" id="inv-bg-btn" title="Remove background" onclick="removeInvPhotoBg(event)">✨ BG</button>
+    </div>`;
+  thumbs.innerHTML = invPhotos.map((p, i) => `
+    <div class="inv-thumb${i === invPhotoIdx ? ' active' : ''}" onclick="invPhotoGo(${i})"><img src="${p.src}" alt=""/></div>`).join('')
+    + `<div class="inv-thumb add" title="Add more photos" onclick="document.getElementById('inv-photo-input').click()">＋</div>`;
+}
+
+// Upload any new (non-remote) photos; return the full ordered URL list.
+async function uploadInvPhotos() {
+  const urls = [];
+  for (const p of invPhotos) {
+    if (p.remote) { urls.push(p.src); continue; }
+    const u = await uploadFiles([p.blob], 'inventory', 'items', 1);
+    if (u.length) urls.push(u[0]);
+  }
+  return urls;
+}
+
 function openInventoryPanel(itemId) {
   const item = inventoryData.find(x=>String(x.id)===String(itemId));
   if (!item) { toast('Item not found',true); return; }
@@ -1649,14 +1821,14 @@ function openInventoryPanel(itemId) {
   document.getElementById('inv-cat').value   = item.category||'Top';
   document.getElementById('inv-staff-uploaded').checked = !!item.staff_uploaded;
 
-  // Show existing photo
-  const preview = document.getElementById('inv-photo-preview');
-  if (item.photo_url) {
-    preview.innerHTML = `<img src="${item.photo_url}" alt="" style="width:100%;height:100%;object-fit:cover"/>`;
-  } else {
-    preview.innerHTML = `<input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
-      <div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div></div>`;
-  }
+  // Load existing photos into the gallery
+  resetInvPhotos();
+  let existing = [];
+  if (Array.isArray(item.photo_urls) && item.photo_urls.length) existing = item.photo_urls;
+  else if (item.photo_url) existing = [item.photo_url];
+  invPhotos = existing.filter(Boolean).map(u => ({ src: u, blob: null, remote: true }));
+  invPhotoIdx = 0;
+  renderInvGallery();
 
   // Pre-select assigned model
   const sel = document.getElementById('inv-model-assign');
@@ -1701,11 +1873,9 @@ async function updateInvItem(itemId) {
     const staffUploaded = document.getElementById('inv-staff-uploaded').checked;
     const updates = { name:nameVal, category:catVal, size_qty:sizeVal, assigned_model:assignVal, staff_uploaded:staffUploaded };
 
-    const photoInput = document.getElementById('inv-photo-input');
-    if (photoInput && photoInput.files[0]) {
-      const u = await uploadFiles([photoInput.files[0]],'inventory','items',1);
-      if (u.length) updates.photo_url = u[0];
-    }
+    const urls = await uploadInvPhotos();
+    updates.photo_urls = urls;
+    updates.photo_url = urls[0] || '';
 
     const { error } = await sb.from('inventory').update(updates).eq('id',itemId);
     if (error) { toast('Error: '+error.message,true); return; }
@@ -1725,9 +1895,8 @@ function openInvModal() {
   document.getElementById('inv-name').value='';
   document.getElementById('inv-size').value='';
   document.getElementById('inv-staff-uploaded').checked = currentUser?.role !== 'ADMIN';
-  document.getElementById('inv-photo-preview').innerHTML=`
-    <input type="file" id="inv-photo-input" accept="image/*" onchange="previewInvPhoto(this)" style="display:none"/>
-    <div id="inv-photo-placeholder"><div style="font-size:28px;margin-bottom:6px">👕</div><div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to upload photo</div></div>`;
+  resetInvPhotos();
+  renderInvGallery();
   // Reset save button to Add mode
   const saveBtn = document.querySelector('#inv-modal-overlay .btn.btn-brown');
   if (saveBtn) { saveBtn.textContent='Save Item'; saveBtn.onclick=saveInvItem; }
@@ -1758,17 +1927,13 @@ async function saveInvItem() {
     const sizeVal=document.getElementById('inv-size').value.trim();
     const catVal=document.getElementById('inv-cat').value;
     const assignVal=document.getElementById('inv-model-assign').value;
-    const photoInput=document.getElementById('inv-photo-input');
-    let photoUrl='';
-    if (photoInput && photoInput.files[0]) {
-      const u=await uploadFiles([photoInput.files[0]],'inventory','items');
-      if (u.length) photoUrl=u[0];
-    }
-    if (!nameVal && !photoUrl) { toast('Add a photo or name',true); return; }
+    const urls = await uploadInvPhotos();
+    const photoUrl = urls[0] || '';
+    if (!nameVal && !urls.length) { toast('Add a photo or name',true); return; }
     const isStaff = currentUser && currentUser.role !== 'ADMIN' && currentUser.role !== 'MODEL';
     const staffUploaded = isStaff ? true : document.getElementById('inv-staff-uploaded').checked;
     const uploadedBy = isStaff ? (currentUser.name||'') : '';
-    const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,staff_uploaded:staffUploaded,uploaded_by:uploadedBy});
+    const { error }=await sb.from('inventory').insert({name:nameVal,category:catVal,size_qty:sizeVal,assigned_model:assignVal,photo_url:photoUrl,photo_urls:urls,staff_uploaded:staffUploaded,uploaded_by:uploadedBy});
     if (error) { toast('Error: '+error.message,true); return; }
     toast('Item added ✓');
     document.getElementById('inv-modal-overlay').classList.add('hidden');
@@ -2036,6 +2201,7 @@ async function saveEditDetails() {
         size_qty: '',
         assigned_model: modelName,
         photo_url: url,
+        photo_urls: [url],
       }));
       await sb.from('inventory').insert(rows);
       // Refresh local inventory cache
