@@ -720,6 +720,28 @@ button { cursor: pointer; font-family: var(--font-body); border: none; backgroun
   padding: 2px 6px; border-radius: 10px; pointer-events: none;
 }
 
+/* ── INVENTORY PHOTO CROP ── */
+.inv-crop-stage {
+  position: relative; width: 100%; max-height: 60vh; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: repeating-conic-gradient(#e8e2d8 0% 25%, #f5f1e9 0% 50%) 50% / 20px 20px;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  touch-action: none; user-select: none;
+}
+.inv-crop-stage img { display: block; max-width: 100%; max-height: 60vh; pointer-events: none; }
+.inv-crop-box {
+  position: absolute; border: 2px dashed #fff; box-shadow: 0 0 0 9999px rgba(0,0,0,.45);
+  cursor: move;
+}
+.inv-crop-handle {
+  position: absolute; width: 16px; height: 16px; background: #fff; border: 2px solid var(--brown);
+  border-radius: 50%; transform: translate(-50%, -50%);
+}
+.inv-crop-handle.tl { top: 0; left: 0; cursor: nwse-resize; }
+.inv-crop-handle.tr { top: 0; left: 100%; cursor: nesw-resize; }
+.inv-crop-handle.bl { top: 100%; left: 0; cursor: nesw-resize; }
+.inv-crop-handle.br { top: 100%; left: 100%; cursor: nwse-resize; }
+
 /* ── INVENTORY CARD WITH PHOTO ── */
 .inv-card-photo {
   position: relative;

@@ -1755,6 +1755,129 @@ async function removeInvPhotoBg(ev) {
   }
 }
 
+// Crop the current photo via a draggable/resizable box overlay.
+let _cropDrag = null;
+async function openInvCrop(ev) {
+  if (ev) ev.stopPropagation();
+  const p = invPhotos[invPhotoIdx];
+  if (!p) return;
+  const overlay = document.getElementById('inv-crop-overlay');
+  const img = document.getElementById('inv-crop-img');
+  const box = document.getElementById('inv-crop-box');
+  img.src = p.src;
+  overlay.classList.remove('hidden');
+  await new Promise(r => { if (img.complete && img.naturalWidth) r(); else img.onload = r; });
+  const w = img.clientWidth, h = img.clientHeight;
+  const bw = w * 0.8, bh = h * 0.8;
+  box.style.left = ((w - bw) / 2) + 'px';
+  box.style.top = ((h - bh) / 2) + 'px';
+  box.style.width = bw + 'px';
+  box.style.height = bh + 'px';
+  box.onpointerdown = invCropPointerDown;
+}
+
+function cancelInvCrop() {
+  document.getElementById('inv-crop-overlay').classList.add('hidden');
+}
+
+function invCropPointerDown(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const box = document.getElementById('inv-crop-box');
+  const stage = document.getElementById('inv-crop-stage');
+  const img = document.getElementById('inv-crop-img');
+  const handle = e.target.classList.contains('inv-crop-handle')
+    ? (e.target.classList.contains('tl') ? 'tl' : e.target.classList.contains('tr') ? 'tr' : e.target.classList.contains('bl') ? 'bl' : 'br')
+    : 'move';
+  _cropDrag = {
+    handle, startX: e.clientX, startY: e.clientY,
+    left: box.offsetLeft, top: box.offsetTop, width: box.offsetWidth, height: box.offsetHeight,
+    minX: img.offsetLeft, minY: img.offsetTop,
+    maxX: img.offsetLeft + img.clientWidth, maxY: img.offsetTop + img.clientHeight
+  };
+  document.addEventListener('pointermove', invCropPointerMove);
+  document.addEventListener('pointerup', invCropPointerUp);
+}
+
+function invCropPointerMove(e) {
+  if (!_cropDrag) return;
+  const box = document.getElementById('inv-crop-box');
+  const d = _cropDrag;
+  const dx = e.clientX - d.startX, dy = e.clientY - d.startY;
+  let { left, top, width, height } = d;
+  const minSize = 24;
+  if (d.handle === 'move') {
+    left = Math.min(Math.max(d.left + dx, d.minX), d.maxX - width);
+    top = Math.min(Math.max(d.top + dy, d.minY), d.maxY - height);
+  } else {
+    if (d.handle.includes('l')) {
+      left = Math.min(Math.max(d.left + dx, d.minX), d.left + d.width - minSize);
+      width = (d.left + d.width) - left;
+    }
+    if (d.handle.includes('r')) {
+      width = Math.min(Math.max(d.width + dx, minSize), d.maxX - d.left);
+    }
+    if (d.handle.includes('t')) {
+      top = Math.min(Math.max(d.top + dy, d.minY), d.top + d.height - minSize);
+      height = (d.top + d.height) - top;
+    }
+    if (d.handle.includes('b')) {
+      height = Math.min(Math.max(d.height + dy, minSize), d.maxY - d.top);
+    }
+  }
+  box.style.left = left + 'px';
+  box.style.top = top + 'px';
+  box.style.width = width + 'px';
+  box.style.height = height + 'px';
+}
+
+function invCropPointerUp() {
+  _cropDrag = null;
+  document.removeEventListener('pointermove', invCropPointerMove);
+  document.removeEventListener('pointerup', invCropPointerUp);
+}
+
+async function applyInvCrop() {
+  const p = invPhotos[invPhotoIdx];
+  const img = document.getElementById('inv-crop-img');
+  const box = document.getElementById('inv-crop-box');
+  if (!p || !img.naturalWidth) return;
+  const scaleX = img.naturalWidth / img.clientWidth;
+  const scaleY = img.naturalHeight / img.clientHeight;
+  const sx = (box.offsetLeft - img.offsetLeft) * scaleX;
+  const sy = (box.offsetTop - img.offsetTop) * scaleY;
+  const sw = box.offsetWidth * scaleX;
+  const sh = box.offsetHeight * scaleY;
+  try {
+    let srcForLoad = p.src;
+    let objUrl = null;
+    if (!p.blob) {
+      const r = await fetch(p.src);
+      const b = await r.blob();
+      objUrl = URL.createObjectURL(b);
+      srcForLoad = objUrl;
+    }
+    const full = await loadImg(srcForLoad);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(sw));
+    c.height = Math.max(1, Math.round(sh));
+    const ctx = c.getContext('2d');
+    ctx.drawImage(full, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    if (objUrl) URL.revokeObjectURL(objUrl);
+    const isPng = !!(p.blob && p.blob.type === 'image/png');
+    const type = isPng ? 'image/png' : 'image/jpeg';
+    const blob = await new Promise(r => c.toBlob(r, type, 0.92));
+    const src = await blobToDataURL(blob);
+    invPhotos[invPhotoIdx] = { src, blob: new File([blob], 'photo.' + (isPng ? 'png' : 'jpg'), { type }), remote: false };
+    cancelInvCrop();
+    renderInvGallery();
+  } catch (e) {
+    console.error('crop failed', e);
+    toast('Could not crop this photo', true);
+    cancelInvCrop();
+  }
+}
+
 // Touch swipe on the main image
 let _invSwipeX = null;
 function invSwipeStart(e) { _invSwipeX = e.changedTouches ? e.changedTouches[0].clientX : null; }
@@ -1793,6 +1916,7 @@ function renderInvGallery() {
     <button type="button" class="inv-gal-del" title="Remove this photo" onclick="removeInvPhotoAt(${invPhotoIdx}, event)">✕</button>
     <div class="inv-gal-tools">
       <button type="button" class="inv-gal-tool" title="Rotate 90°" onclick="rotateInvPhoto(event)">↻</button>
+      <button type="button" class="inv-gal-tool" title="Crop" onclick="openInvCrop(event)">⬚ Crop</button>
       <button type="button" class="inv-gal-tool" id="inv-bg-btn" title="Remove background" onclick="removeInvPhotoBg(event)">✨ BG</button>
     </div>`;
   thumbs.innerHTML = invPhotos.map((p, i) => `

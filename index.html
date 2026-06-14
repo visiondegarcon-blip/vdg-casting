@@ -956,6 +956,31 @@
     </div>
   </div>
 
+  <!-- INVENTORY PHOTO CROP MODAL -->
+  <div class="modal-overlay hidden" id="inv-crop-overlay" onclick="if(event.target===this) cancelInvCrop()">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <span style="font-family:var(--font-display);font-size:22px;font-weight:400;letter-spacing:.04em">Crop Photo</span>
+        <button class="panel-close" onclick="cancelInvCrop()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="inv-crop-stage" id="inv-crop-stage">
+          <img id="inv-crop-img" alt=""/>
+          <div class="inv-crop-box" id="inv-crop-box">
+            <div class="inv-crop-handle tl"></div>
+            <div class="inv-crop-handle tr"></div>
+            <div class="inv-crop-handle bl"></div>
+            <div class="inv-crop-handle br"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button class="btn btn-secondary" style="flex:1" onclick="cancelInvCrop()">Cancel</button>
+          <button class="btn" style="flex:1" onclick="applyInvCrop()">Apply Crop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- INVENTORY MODAL -->
   <div class="modal-overlay hidden" id="inv-modal-overlay" onclick="closeInvModal(event)">
     <div class="modal">
@@ -1354,6 +1379,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>
