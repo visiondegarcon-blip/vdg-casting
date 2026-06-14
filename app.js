@@ -727,7 +727,6 @@ function renderAdminModels(search) {
     const q = search.toLowerCase();
     list = list.filter(m=>(m.full_name||'').toLowerCase().includes(q)||(m.instagram||'').toLowerCase().includes(q)||(m.suburb||'').toLowerCase().includes(q));
   }
-  if (activeTab==='completed') list = list.filter(m=>isCompleted(m));
   if (activeTab==='mymodels') list = list.filter(m=>m.assigned_stylist===currentUser?.name);
   // Sign Up Tracker only on All tab
   if (activeTab === 'all') {
@@ -741,6 +740,25 @@ function renderAdminModels(search) {
   if (dp) dp.innerHTML = '';
   const grid = document.getElementById('admin-model-grid');
   if (!grid) return;
+
+  if (activeTab === 'completed') {
+    const sections = [
+      { title: 'Outfit Complete', icon: '👕', filter: m => !!m.checklist_outfit },
+      { title: 'Make Up Complete', icon: '💄', filter: m => !!m.checklist_makeup },
+      { title: 'Hair Complete', icon: '💇', filter: m => !!m.checklist_hair },
+      { title: 'All Completed', icon: '✅', filter: m => isCompleted(m) },
+    ];
+    grid.innerHTML = sections.map(s => {
+      const items = list.filter(s.filter);
+      return `
+        <details class="completed-section" open>
+          <summary class="completed-section-summary">${s.icon} ${s.title} <span class="dim-text" style="font-size:11px">${items.length}</span></summary>
+          <div class="model-grid">${items.length ? items.map(m=>modelCardHTML(m,'ADMIN')).join('') : '<div class="loading-center" style="grid-column:1/-1">No models here</div>'}</div>
+        </details>`;
+    }).join('');
+    return;
+  }
+
   grid.innerHTML = list.length ? list.map(m=>modelCardHTML(m,'ADMIN')).join('') : '<div class="loading-center" style="grid-column:1/-1">No models here</div>';
 }
 
