@@ -1917,7 +1917,7 @@ function renderInvGallery() {
     <div class="inv-gal-tools">
       <button type="button" class="inv-gal-tool" title="Rotate 90°" onclick="rotateInvPhoto(event)">↻</button>
       <button type="button" class="inv-gal-tool" title="Crop" onclick="openInvCrop(event)">⬚ Crop</button>
-      <button type="button" class="inv-gal-tool" id="inv-bg-btn" title="Remove background" onclick="removeInvPhotoBg(event)">✨ BG</button>
+      <button type="button" class="inv-gal-tool" id="inv-bg-btn" title="Remove background" onclick="removeInvPhotoBg(event)">✨ Remove BG</button>
     </div>`;
   thumbs.innerHTML = invPhotos.map((p, i) => `
     <div class="inv-thumb${i === invPhotoIdx ? ' active' : ''}" onclick="invPhotoGo(${i})"><img src="${p.src}" alt=""/></div>`).join('')
