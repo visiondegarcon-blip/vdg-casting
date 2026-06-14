@@ -6,7 +6,7 @@ const SUPABASE_KEY = "sb_publishable_tKMXDxTa-uICYsBE3OUh7A_RsoGFhhf";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const STAFF_NAMES = {
-  STYLIST:       ["Daniel", "Dee", "Komi", "Richelle"],
+  STYLIST:       ["Daniel", "Dee", "Komi", "Richelle", "Didier"],
   HAIR_STYLIST:  ["Christie", "Maria", "Neza"],
   MAKEUP_ARTIST: ["Rebecca"],
   ADMIN:         ["Daniel"]
