@@ -3267,11 +3267,11 @@ function creativeCardHTML(c) {
   const signedUp = c.registered;
 
   return `<div class="model-card" onclick="openCreativePanel('${c.id}')">
-    <div class="model-card-top">
-      <div class="model-avatar">${avatar}</div>
-      <div class="model-card-info">
-        <div class="model-name">${c.full_name||'—'}</div>
-        ${c.instagram ? `<div class="model-handle">@${c.instagram}</div>` : ''}
+    <div class="card-top">
+      <div class="card-avatar">${avatar}</div>
+      <div class="card-name-block">
+        <div class="card-name">${c.full_name||'—'}</div>
+        <div class="card-handle">${c.instagram?'@'+c.instagram:'—'}</div>
       </div>
     </div>
     <div class="model-card-badges">
