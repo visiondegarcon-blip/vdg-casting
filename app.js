@@ -3157,19 +3157,21 @@ async function signUpCreative(username, pin) {
   }
   const musicFile = document.getElementById('cr-music-file')?.files[0] || null;
   const musicLink = document.getElementById('cr-music-link')?.value.trim() || '';
+  const musicLink2 = document.getElementById('cr-music-link-2')?.value.trim() || '';
+  const musicLink3 = document.getElementById('cr-music-link-3')?.value.trim() || '';
   if (musicFile && musicFile.size > 25 * 1024 * 1024) {
-    showError('signup-error', 'Music file is too large (max 25 MB). Upload a smaller file or use a link.');
+    showError('signup-error', 'Music file is too large (max 25 MB). Upload a smaller file or paste a link instead.');
     return;
   }
 
   if (isNewCreative) {
-    await signUpNewCreative(username, pin, crType, profInput.files[0], musicFile, musicLink);
+    await signUpNewCreative(username, pin, crType, profInput.files[0], musicFile, musicLink, musicLink2, musicLink3);
   } else {
-    await signUpExistingCreative(username, pin, crType, profInput.files[0], musicFile, musicLink);
+    await signUpExistingCreative(username, pin, crType, profInput.files[0], musicFile, musicLink, musicLink2, musicLink3);
   }
 }
 
-async function signUpExistingCreative(username, pin, crType, profileFile, musicFile, musicLink) {
+async function signUpExistingCreative(username, pin, crType, profileFile, musicFile, musicLink, musicLink2, musicLink3) {
   const nameVal = document.getElementById('signup-creative-name').value;
   if (!nameVal) { showError('signup-error', 'Select your name.'); return; }
   const { data: ex } = await sb.from('creative_profiles').select('id').eq('username', username).maybeSingle();
@@ -3185,6 +3187,8 @@ async function signUpExistingCreative(username, pin, crType, profileFile, musicF
   const updates = { username, pin, registered: true, creative_type: crType, profile_photo: profileUrl };
   if (musicFileUrl) updates.music_file_url = musicFileUrl;
   if (musicLink) updates.music_link = musicLink;
+  if (musicLink2) updates.music_link_2 = musicLink2;
+  if (musicLink3) updates.music_link_3 = musicLink3;
   if (mediaUrls.length) updates.media_urls = mediaUrls;
 
   const { error } = await sb.from('creative_profiles').update(updates).eq('id', nameVal);
@@ -3194,7 +3198,7 @@ async function signUpExistingCreative(username, pin, crType, profileFile, musicF
   showTab('signin');
 }
 
-async function signUpNewCreative(username, pin, crType, profileFile, musicFile, musicLink) {
+async function signUpNewCreative(username, pin, crType, profileFile, musicFile, musicLink, musicLink2, musicLink3) {
   const fullName = document.getElementById('cr-new-full-name').value.trim();
   if (!fullName) { showError('signup-error', 'Enter your full name.'); return; }
   const { data: ex } = await sb.from('creative_profiles').select('id').eq('username', username).maybeSingle();
@@ -3233,6 +3237,8 @@ async function signUpNewCreative(username, pin, crType, profileFile, musicFile, 
     profile_photo: profileUrl,
     music_file_url: musicFileUrl,
     music_link: musicLink,
+    music_link_2: musicLink2 || null,
+    music_link_3: musicLink3 || null,
     media_urls: mediaUrls,
     username, pin, registered: true,
     tags: [], notes: ''
@@ -3306,12 +3312,12 @@ async function openCreativePanel(id) {
       <audio controls preload="metadata" style="width:100%;border-radius:var(--radius-sm)"><source src="${c.music_file_url}"/></audio>
     </div>`);
   }
-  if (c.music_link) {
+  [c.music_link, c.music_link_2, c.music_link_3].filter(Boolean).forEach((lnk, i) => {
     musicSection.push(`<div style="margin-bottom:12px">
-      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">MUSIC LINK</div>
-      <a href="${c.music_link}" target="_blank" rel="noopener" style="color:var(--brown);word-break:break-all;font-size:13px">${c.music_link}</a>
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">AUDIO LINK${i > 0 ? ' ' + (i + 1) : ''}</div>
+      <a href="${lnk}" target="_blank" rel="noopener" style="color:var(--brown);word-break:break-all;font-size:13px">${lnk}</a>
     </div>`);
-  }
+  });
 
   const detail = (label, val) => val ? `<div class="detail-item"><span class="detail-label">${label}</span><span class="detail-value">${val}</span></div>` : '';
 
@@ -3443,12 +3449,12 @@ function showCreativeDashboard(c) {
       <audio controls preload="metadata" style="width:100%;border-radius:var(--radius-sm)"><source src="${c.music_file_url}"/></audio>
     </div>`);
   }
-  if (c.music_link) {
-    musicSection.push(`<div>
-      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">YOUR MUSIC LINK</div>
-      <a href="${c.music_link}" target="_blank" rel="noopener" style="color:var(--brown);word-break:break-all;font-size:13px">${c.music_link}</a>
+  [c.music_link, c.music_link_2, c.music_link_3].filter(Boolean).forEach((lnk, i) => {
+    musicSection.push(`<div style="margin-bottom:8px">
+      <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:6px">YOUR AUDIO LINK${i > 0 ? ' ' + (i + 1) : ''}</div>
+      <a href="${lnk}" target="_blank" rel="noopener" style="color:var(--brown);word-break:break-all;font-size:13px">${lnk}</a>
     </div>`);
-  }
+  });
 
   const mediaUrls = toArr(c.media_urls);
   const mediaSection = mediaUrls.length ? `<div class="model-section">
