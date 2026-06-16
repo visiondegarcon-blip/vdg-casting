@@ -3550,6 +3550,8 @@ function showCreativeDashboard(c) {
         <div style="margin-top:8px"><span class="badge badge-brown">${c.creative_type||'Creative'}</span></div>
       </div>
 
+      <button class="btn btn-danger" style="width:100%;margin-bottom:16px" id="cr-edit-toggle-btn" onclick="toggleCreativeEdit()">✏️ Edit My Uploads & Links</button>
+
       ${c.bio ? `<div class="model-section">
         <div class="model-section-title">About You</div>
         <div style="font-size:13px;line-height:1.6;color:var(--text)">${c.bio}</div>
@@ -3576,7 +3578,6 @@ function showCreativeDashboard(c) {
         </div>
       </div>
 
-      <button class="btn btn-ghost" style="width:100%;margin-top:8px" id="cr-edit-toggle-btn" onclick="toggleCreativeEdit()">✏️ Edit My Uploads & Links</button>
       ${editForm}
     </div>
   `;
