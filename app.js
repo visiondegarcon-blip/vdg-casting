@@ -3466,6 +3466,81 @@ function showCreativeDashboard(c) {
     </div>
   </div>` : '';
 
+  // Build edit form with current values pre-filled
+  const escVal = v => (v||'').replace(/"/g,'&quot;');
+  const editForm = `
+    <div id="cr-edit-form" class="hidden" style="margin-top:16px;border-top:2px solid var(--black);padding-top:20px">
+      <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px">UPDATE YOUR PROFILE</div>
+
+      <div class="form-group">
+        <label>Profile Picture</label>
+        <div class="profile-photo-upload">
+          <div class="profile-photo-preview" id="cr-edit-profile-preview" onclick="document.getElementById('cr-edit-profile-input').click()" style="cursor:pointer">
+            ${c.profile_photo ? `<img src="${c.profile_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>` : '📸'}
+            <input type="file" id="cr-edit-profile-input" accept="image/*" onchange="previewCreativeEditProfile(this)" style="display:none"/>
+          </div>
+          <div style="font-size:12px;color:var(--dim);font-family:var(--font-mono)">Tap to change your profile picture</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--black)">
+        <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase">BACKGROUND MUSIC</div>
+      </div>
+
+      <div class="form-group">
+        <label>Replace Music File <span style="color:var(--dim)">(MP3, M4A — max 25 MB)</span></label>
+        ${c.music_file_url ? `<div style="font-size:12px;color:var(--dim);font-family:var(--font-mono);margin-bottom:8px">Current: <audio controls preload="none" style="height:28px;vertical-align:middle"><source src="${c.music_file_url}"/></audio></div>` : ''}
+        <div class="upload-zone" onclick="document.getElementById('cr-edit-music-file').click()">
+          <input type="file" id="cr-edit-music-file" accept=".mp3,.m4a,audio/mpeg,audio/x-m4a,audio/mp4" style="display:none" onchange="document.getElementById('cr-edit-music-preview').textContent=this.files[0]?.name||''"/>
+          <div class="upload-zone-icon">🎵</div>
+          <div class="upload-zone-text">${c.music_file_url ? 'Tap to replace your track' : 'Tap to upload your background music'}</div>
+        </div>
+        <div id="cr-edit-music-preview" style="font-size:12px;color:var(--brown);font-family:var(--font-mono);margin-top:6px"></div>
+      </div>
+
+      <div class="form-group">
+        <div style="background:#fffbeb;border:1.5px solid #f6d28b;border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px">
+          <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);color:#92400e;margin-bottom:4px">📎 Prefer higher quality or WAV files?</div>
+          <div style="font-size:12px;color:#92400e;font-family:var(--font-mono);line-height:1.5">The file upload limit here is <strong>25 MB</strong>. If your file is larger or you'd prefer to send WAV / lossless quality, paste a link below and we'll download it for you.</div>
+        </div>
+        <label>Audio Link 1</label>
+        <input type="url" id="cr-edit-music-link" placeholder="https://..." autocapitalize="none" value="${escVal(c.music_link)}" style="margin-bottom:8px"/>
+        <label>Audio Link 2 <span style="color:var(--dim)">(optional)</span></label>
+        <input type="url" id="cr-edit-music-link-2" placeholder="https://..." autocapitalize="none" value="${escVal(c.music_link_2)}" style="margin-bottom:8px"/>
+        <label>Audio Link 3 <span style="color:var(--dim)">(optional)</span></label>
+        <input type="url" id="cr-edit-music-link-3" placeholder="https://..." autocapitalize="none" value="${escVal(c.music_link_3)}"/>
+      </div>
+
+      <div style="margin-top:20px;margin-bottom:12px;padding-bottom:10px;border-bottom:2px solid var(--black)">
+        <div style="font-size:12px;font-weight:700;font-family:var(--font-mono);letter-spacing:.1em;text-transform:uppercase">BACKGROUND MEDIA</div>
+        <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-top:3px">Replacing will remove your existing media — up to 5 photos or videos</div>
+      </div>
+
+      ${mediaUrls.length ? `<div style="margin-bottom:12px">
+        <div style="font-size:11px;color:var(--dim);font-family:var(--font-mono);margin-bottom:8px">CURRENT MEDIA</div>
+        <div class="media-gallery" style="margin-bottom:0">
+          ${mediaUrls.map(u => /\.(mp4|mov|webm|m4v)$/i.test(u)
+            ? `<video src="${u}" controls preload="metadata" style="max-height:100px"></video>`
+            : `<img src="${u}" alt="" style="max-height:100px;object-fit:cover;border-radius:var(--radius-sm)"/>`).join('')}
+        </div>
+      </div>` : ''}
+
+      <div class="form-group">
+        <label>Upload New Media <span style="color:var(--dim)">(replaces existing)</span></label>
+        <div class="upload-zone" onclick="document.getElementById('cr-edit-media').click()">
+          <input type="file" id="cr-edit-media" multiple accept="image/*,video/*" style="display:none" onchange="pickFiles('cr-edit-media',5)"/>
+          <div class="upload-zone-icon">🎬</div>
+          <div class="upload-zone-text">Tap to add background photos/videos</div>
+        </div>
+        <div class="file-previews" id="cr-edit-media-previews"></div>
+      </div>
+
+      <div id="cr-edit-error" style="color:var(--error);font-size:13px;font-family:var(--font-mono);min-height:18px;margin-bottom:8px"></div>
+      <button class="btn btn-primary" style="width:100%" onclick="saveCreativeEdits()">Save Changes</button>
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="toggleCreativeEdit()">Cancel</button>
+    </div>
+  `;
+
   wrap.innerHTML = `
     <div class="model-profile-card">
       <div style="text-align:center;margin-bottom:16px">
@@ -3500,8 +3575,90 @@ function showCreativeDashboard(c) {
           ${c.performance_description ? `<div class="detail-item"><span class="detail-label">Performance</span><span class="detail-value">${c.performance_description}</span></div>` : ''}
         </div>
       </div>
+
+      <button class="btn btn-ghost" style="width:100%;margin-top:8px" id="cr-edit-toggle-btn" onclick="toggleCreativeEdit()">✏️ Edit My Uploads & Links</button>
+      ${editForm}
     </div>
   `;
+}
+
+function toggleCreativeEdit() {
+  const form = document.getElementById('cr-edit-form');
+  const btn  = document.getElementById('cr-edit-toggle-btn');
+  if (!form) return;
+  const opening = form.classList.contains('hidden');
+  form.classList.toggle('hidden', !opening);
+  if (btn) btn.classList.toggle('hidden', opening);
+  if (opening) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function previewCreativeEditProfile(input) {
+  const preview = document.getElementById('cr-edit-profile-preview');
+  if (!preview || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => { preview.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/><input type="file" id="cr-edit-profile-input" accept="image/*" onchange="previewCreativeEditProfile(this)" style="display:none"/>`; };
+  reader.readAsDataURL(input.files[0]);
+}
+
+async function saveCreativeEdits() {
+  const c = currentCreativeData;
+  if (!c) return;
+  const btn = document.querySelector('#cr-edit-form .btn-primary');
+  const errEl = document.getElementById('cr-edit-error');
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  try {
+    const folder = c.username || c.id;
+    const updates = {};
+
+    // Profile photo
+    const profFile = document.getElementById('cr-edit-profile-input')?.files[0];
+    if (profFile) {
+      const url = await uploadCreativePhoto(profFile, folder);
+      if (url) updates.profile_photo = url;
+    }
+
+    // Music file
+    const musicFile = document.getElementById('cr-edit-music-file')?.files[0];
+    if (musicFile) {
+      if (musicFile.size > 25 * 1024 * 1024) { errEl.textContent = 'Music file must be under 25 MB.'; btn.disabled = false; btn.textContent = 'Save Changes'; return; }
+      const path = `${folder}/music_${Date.now()}_${musicFile.name}`;
+      const { error } = await sb.storage.from('creative-files').upload(path, musicFile, { upsert: true, contentType: musicFile.type });
+      if (!error) {
+        const { data } = sb.storage.from('creative-files').getPublicUrl(path);
+        updates.music_file_url = data.publicUrl;
+      }
+    }
+
+    // Audio links
+    const l1 = document.getElementById('cr-edit-music-link')?.value.trim();
+    const l2 = document.getElementById('cr-edit-music-link-2')?.value.trim();
+    const l3 = document.getElementById('cr-edit-music-link-3')?.value.trim();
+    updates.music_link   = l1 || null;
+    updates.music_link_2 = l2 || null;
+    updates.music_link_3 = l3 || null;
+
+    // Background media (only if new files chosen)
+    const newMedia = chosenFiles('cr-edit-media');
+    if (newMedia.length) {
+      const mediaUrls = await uploadCreativeMedia(newMedia, folder);
+      if (mediaUrls.length) updates.media_urls = mediaUrls;
+    }
+
+    const { error: saveErr } = await sb.from('creative_profiles').update(updates).eq('id', c.id);
+    if (saveErr) throw saveErr;
+
+    // Refresh dashboard with updated data
+    const { data: fresh } = await sb.from('creative_profiles').select('*').eq('id', c.id).maybeSingle();
+    if (fresh) showCreativeDashboard(fresh);
+    toast('Profile updated!');
+  } catch (e) {
+    errEl.textContent = e.message || 'Save failed — please try again.';
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
 }
 
 // ═══════════════════════════════════════════════
