@@ -749,6 +749,7 @@
         <button class="nav-item" onclick="adminNav('creatives',this)"><span class="nav-icon">♫</span> Creatives</button>
         <button class="nav-item" onclick="adminNav('inventory',this)"><span class="nav-icon">◫</span> Inventory</button>
         <button class="nav-item" onclick="adminNav('team',this)"><span class="nav-icon">◈</span> Team</button>
+        <button class="nav-item" onclick="adminNav('todo',this)"><span class="nav-icon">☑</span> To Do <span id="todo-nav-badge" class="todo-nav-badge hidden"></span></button>
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-user-name" id="admin-name-display">—</div>
@@ -828,6 +829,30 @@
           </div>
           <div class="model-grid" id="admin-creative-grid"></div>
         </div>
+      </div>
+      <!-- ADMIN TO DO PANEL -->
+      <div id="admin-todo-panel" class="panel-content hidden">
+        <div class="todo-progress-wrap">
+          <div class="todo-progress-row">
+            <div class="todo-progress-label">
+              <span>Tasks complete</span>
+              <span id="todo-pct-text">0 / 16</span>
+            </div>
+            <div class="todo-bar-track">
+              <div class="todo-bar-fill todo-bar-tasks" id="todo-bar-tasks" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="todo-progress-row">
+            <div class="todo-progress-label">
+              <span>Days to event — Jul 5</span>
+              <span id="todo-days-text">— days</span>
+            </div>
+            <div class="todo-bar-track">
+              <div class="todo-bar-fill todo-bar-days" id="todo-bar-days" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+        <div id="todo-list"></div>
       </div>
     </main>
   </section>

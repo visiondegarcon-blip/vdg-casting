@@ -682,7 +682,95 @@ function adminNav(page, btn) {
     document.getElementById('model-search').style.display = 'none';
     document.getElementById('inventory-tab-content').classList.remove('hidden');
     loadInventory().then(() => renderInventoryGrid('inv-grid','inv-count',true));
+  } else if (page === 'todo') {
+    if (topbarActions) topbarActions.style.display = 'none';
+    if (tabNav) tabNav.style.display = 'none';
+    document.getElementById('model-search').style.display = 'none';
+    document.getElementById('admin-models-panel').classList.add('hidden');
+    document.getElementById('admin-todo-panel').classList.remove('hidden');
+    renderTodo();
   }
+}
+
+// ═══════════════════════════════════════════════
+// TO DO LIST
+// ═══════════════════════════════════════════════
+const TODO_ITEMS = [
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t1',  tag:'urgent',    title:'Sudanese dance group — locked in',              sub:'Written confirm, contact backup, confirmed date + time of arrival' },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t2',  tag:'urgent',    title:'All musicians and rappers confirmed',            sub:'Name, set length, tech rider (mic, monitor, backing track needs)' },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t3',  tag:null,        title:'Sound operator confirmed',                      sub:'Already mentioned but get it in writing — arrival time, setup window' },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t4',  tag:null,        title:'Venue access times confirmed with Spine Street Studios', sub:'Load-in, setup, event start, hard out time' },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t5',  tag:null,        title:'Rehearsal date locked with models',             sub:'Location, start time, what they need to bring' },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t6',  tag:null,        title:'Hair stylists, MUA, stylists — confirmed for rehearsal and event day', sub:"Separate confirmations for both dates — don't assume one covers both" },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t7',  tag:null,        title:'Photographer and videographer confirmed',       sub:'Coverage scope, deliverable timeline, payment terms' },
+  { section:'HARD CONFIRMATIONS NEEDED', id:'t8',  tag:null,        title:'Poetry showcase performer confirmed',           sub:'Piece ready? Length? Any tech needs?' },
+  { section:'BUILD & CREATE',            id:'t9',  tag:'urgent',    title:'VDG media showcase — start now',                sub:'What is VDG, Sydney activation, Brazil activation, future vision, global projects' },
+  { section:'BUILD & CREATE',            id:'t10', tag:'this week', title:'Event run sheet — timed, with lead names',     sub:"Every segment: start time, duration, who's responsible, contingency" },
+  { section:'BUILD & CREATE',            id:'t11', tag:null,        title:'Volunteer roles assigned',                     sub:'Door, floor, backstage, BTS camera — named people for each' },
+  { section:'BUILD & CREATE',            id:'t12', tag:null,        title:'Thrift sourcing — remaining outfits',          sub:"After next pay cycle, but plan what's still needed before rehearsal" },
+  { section:'BUILD & CREATE',            id:'t13', tag:null,        title:'Ticket push — convert the 251 views',          sub:'Rehearsal teaser, model lineup content, direct outreach to engaged followers' },
+  { section:'PLAN & DECIDE',             id:'t14', tag:null,        title:'Kahoot vs custom quiz — make a call',          sub:'Pick one and move. Custom gives more brand control; Kahoot is faster to build' },
+  { section:'PLAN & DECIDE',             id:'t15', tag:null,        title:'Cultural exhibition materials — source and print', sub:'Global photography, currency display, artist cards — needs lead time for printing' },
+  { section:'PLAN & DECIDE',             id:'t16', tag:null,        title:'PA system hire booked and paid',               sub:'$300 budgeted — confirm booking is locked not just quoted' },
+];
+
+const EVENT_DATE = new Date('2026-07-05T00:00:00');
+const TODO_STORAGE_KEY = 'vdg_todo_checked';
+
+function getTodoChecked() {
+  try { return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY) || '{}'); } catch { return {}; }
+}
+function saveTodoChecked(obj) {
+  localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(obj));
+}
+function toggleTodoItem(id) {
+  const checked = getTodoChecked();
+  checked[id] = !checked[id];
+  saveTodoChecked(checked);
+  renderTodo();
+}
+function renderTodo() {
+  const checked = getTodoChecked();
+  const total = TODO_ITEMS.length;
+  const done  = TODO_ITEMS.filter(t => checked[t.id]).length;
+
+  const taskPct = Math.round((done / total) * 100);
+  document.getElementById('todo-bar-tasks').style.width = taskPct + '%';
+  document.getElementById('todo-pct-text').textContent = done + ' / ' + total;
+
+  const now = new Date();
+  const totalDays = Math.ceil((EVENT_DATE - new Date('2026-01-01')) / 86400000);
+  const daysLeft  = Math.max(0, Math.ceil((EVENT_DATE - now) / 86400000));
+  const elapsed   = totalDays - daysLeft;
+  const daysPct   = Math.min(100, Math.round((elapsed / totalDays) * 100));
+  document.getElementById('todo-bar-days').style.width = daysPct + '%';
+  document.getElementById('todo-days-text').textContent = daysLeft <= 0 ? 'Event day!' : daysLeft + ' days left';
+
+  const remaining = total - done;
+  const badge = document.getElementById('todo-nav-badge');
+  if (remaining > 0) { badge.textContent = remaining; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
+
+  const sections = [...new Set(TODO_ITEMS.map(t => t.section))];
+  document.getElementById('todo-list').innerHTML = sections.map(sec => {
+    const items = TODO_ITEMS.filter(t => t.section === sec);
+    return '<div class="todo-section">' +
+      '<div class="todo-section-title">' + sec + '</div>' +
+      items.map(t => {
+        const isDone = !!checked[t.id];
+        const tag = t.tag === 'urgent' ? '<span class="todo-tag-urgent">Urgent</span>'
+                  : t.tag === 'this week' ? '<span class="todo-tag-week">This Week</span>' : '';
+        return '<div class="todo-item' + (isDone ? ' done' : '') + '" onclick="toggleTodoItem(\'' + t.id + '\')">' +
+          '<div class="todo-checkbox">' + (isDone ? '✓' : '') + '</div>' +
+          '<div class="todo-item-body">' +
+            '<div class="todo-item-title">' + t.title + '</div>' +
+            '<div class="todo-item-sub">' + t.sub + '</div>' +
+          '</div>' +
+          (tag ? '<div class="todo-item-tag">' + tag + '</div>' : '') +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }).join('');
 }
 
 async function setAdminTab(btn, tab) {
