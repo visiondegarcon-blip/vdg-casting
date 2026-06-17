@@ -5,6 +5,37 @@ const SUPABASE_URL = "https://dyruvkzuasaiofkxdvid.supabase.co";
 const SUPABASE_KEY = "sb_publishable_tKMXDxTa-uICYsBE3OUh7A_RsoGFhhf";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ── PIN hashing (SHA-256 via Web Crypto API) ──
+async function hashPin(pin) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+// Returns true if a stored pin value looks like plain text (not yet hashed)
+function isPinPlainText(stored) { return stored && stored.length <= 6; }
+
+// ── Sign-in rate limiting ──
+const SIGNIN_KEY = 'vdg_signin_attempts';
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 5 * 60 * 1000; // 5 minutes
+function getRateLimit() { try { return JSON.parse(localStorage.getItem(SIGNIN_KEY) || '{}'); } catch { return {}; } }
+function recordFailedAttempt() {
+  const d = getRateLimit();
+  d.count = (d.count || 0) + 1;
+  d.last  = Date.now();
+  localStorage.setItem(SIGNIN_KEY, JSON.stringify(d));
+}
+function clearRateLimit() { localStorage.removeItem(SIGNIN_KEY); }
+function isLockedOut() {
+  const d = getRateLimit();
+  if (!d.count || d.count < MAX_ATTEMPTS) return false;
+  if (Date.now() - (d.last || 0) > LOCKOUT_MS) { clearRateLimit(); return false; }
+  return true;
+}
+function lockoutMinutesLeft() {
+  const d = getRateLimit();
+  return Math.ceil((LOCKOUT_MS - (Date.now() - (d.last || 0))) / 60000);
+}
+
 const STAFF_NAMES = {
   STYLIST:       ["Daniel", "Dee", "Komi", "Richelle", "Didier"],
   HAIR_STYLIST:  ["Christie", "Maria", "Neza"],
@@ -349,8 +380,9 @@ async function signUp() {
   const pin      = document.getElementById('signup-pin').value.trim();
   document.getElementById('signup-error').textContent = '';
 
-  if (!role)     { showError('signup-error','Select your role.'); return; }
-  if (!username) { showError('signup-error','Choose a username.'); return; }
+  if (!role)          { showError('signup-error','Select your role.'); return; }
+  if (role === 'ADMIN') { showError('signup-error','Invalid role.'); return; }
+  if (!username)      { showError('signup-error','Choose a username.'); return; }
   if (pin.length !== 4 || isNaN(Number(pin))) { showError('signup-error','PIN must be exactly 4 digits.'); return; }
 
   const btn = document.getElementById('signup-btn');
@@ -373,7 +405,8 @@ async function signUp() {
     const instagram = document.getElementById('signup-staff-instagram').value.trim().replace(/^@/,'');
     const { data:ex } = await sb.from('users').select('id').eq('username',username).maybeSingle();
     if (ex) { showError('signup-error','Username already taken.'); return; }
-    const { error } = await sb.from('users').insert({ name:nameVal, role, username, pin, instagram });
+    const hashedPin = await hashPin(pin);
+    const { error } = await sb.from('users').insert({ name:nameVal, role, username, pin:hashedPin, instagram });
     if (error) { showError('signup-error',error.message); return; }
     toast('Account created! Sign in now.');
     showTab('signin');
@@ -433,7 +466,8 @@ async function signUpExistingModel(username, pin) {
   const { cf: cfAfterPhotos, inputIds: customPhotoIds } = await uploadOfficialCustomPhotos('ex-custom', nameVal, customFields);
   customFields = cfAfterPhotos;
 
-  const updates = { username, pin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, current_hair_photos:curHairUrls, model_note:note, needs_hair:true, needs_makeup:true, no_own_outfit:noOwnOutfit };
+  const hashedPin = await hashPin(pin);
+  const updates = { username, pin:hashedPin, registered:true, approved:true, photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls, face_photos:faceUrls, current_hair_photos:curHairUrls, model_note:note, needs_hair:true, needs_makeup:true, no_own_outfit:noOwnOutfit };
   if (Object.keys(customFields).length) updates.custom_fields = customFields;
   if (profileUrl)  updates.profile_photo  = profileUrl;
   if (ethnicity)   updates.ethnicity      = ethnicity;
@@ -527,7 +561,7 @@ async function signUpNewModel(username, pin) {
     assigned_stylist: document.getElementById('new-no-own-outfit')?.checked ? 'Daniel' : null,
     agency:        document.getElementById('new-agency').value,
     model_note:    document.getElementById('new-note').value.trim(),
-    username, pin, registered:true, approved:true,
+    username, pin: await hashPin(pin), registered:true, approved:true,
     profile_photo: profileUrl, face_photos:faceUrls,
     photos:fitUrls, hair_photos:hairUrls, mua_photos:muaUrls, outfit_photos:outfitUrls,
     current_hair_photos:curHairUrls,
@@ -556,28 +590,50 @@ async function signUpNewModel(username, pin) {
 // SIGN IN
 // ═══════════════════════════════════════════════
 async function signIn() {
+  if (isLockedOut()) {
+    showError('signin-error', `Too many failed attempts. Try again in ${lockoutMinutesLeft()} min.`);
+    return;
+  }
   const username = document.getElementById('signin-username').value.trim().toLowerCase();
   const pin      = document.getElementById('signin-pin').value.trim();
   document.getElementById('signin-error').textContent = '';
   if (!username||!pin) { showError('signin-error','Enter your username and PIN.'); return; }
 
+  async function pinMatches(stored, entered) {
+    if (!stored) return false;
+    if (isPinPlainText(stored)) return stored === entered; // legacy plain-text
+    return stored === await hashPin(entered);
+  }
+  async function migratePinIfNeeded(table, id, storedPin, enteredPin) {
+    if (isPinPlainText(storedPin)) {
+      const hashed = await hashPin(enteredPin);
+      await sb.from(table).update({ pin: hashed }).eq('id', id);
+    }
+  }
+
   const { data:model } = await sb.from('model_profiles').select('*').eq('username',username).maybeSingle();
   if (model) {
-    if (model.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
+    if (!await pinMatches(model.pin, pin)) { recordFailedAttempt(); showError('signin-error','Incorrect PIN.'); return; }
+    clearRateLimit();
+    await migratePinIfNeeded('model_profiles', model.id, model.pin, pin);
     currentUser = { id:model.id, name:model.full_name, role:'MODEL', username };
     showModelDashboard(model);
     return;
   }
   const { data:creative } = await sb.from('creative_profiles').select('*').eq('username',username).maybeSingle();
   if (creative) {
-    if (creative.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
+    if (!await pinMatches(creative.pin, pin)) { recordFailedAttempt(); showError('signin-error','Incorrect PIN.'); return; }
+    clearRateLimit();
+    await migratePinIfNeeded('creative_profiles', creative.id, creative.pin, pin);
     currentUser = { id:creative.id, name:creative.full_name, role:'CREATIVE', username };
     showCreativeDashboard(creative);
     return;
   }
   const { data:user } = await sb.from('users').select('*').eq('username',username).maybeSingle();
-  if (!user) { showError('signin-error','Username not found.'); return; }
-  if (user.pin !== pin) { showError('signin-error','Incorrect PIN.'); return; }
+  if (!user) { recordFailedAttempt(); showError('signin-error','Username not found.'); return; }
+  if (!await pinMatches(user.pin, pin)) { recordFailedAttempt(); showError('signin-error','Incorrect PIN.'); return; }
+  clearRateLimit();
+  await migratePinIfNeeded('users', user.id, user.pin, pin);
   currentUser = { id:user.id, name:user.name, role:user.role, username };
   if (user.role==='ADMIN') showAdminDashboard();
   else showStaffDashboard(user);
@@ -1524,11 +1580,12 @@ async function deleteModel(id, name) {
 async function resetModelPin(id, name) {
   if (!confirm(`Generate a new PIN for ${name||'this model'}? Their old PIN will stop working.`)) return;
   const newPin = String(Math.floor(1000 + Math.random()*9000));
-  const { error } = await sb.from('model_profiles').update({ pin: newPin }).eq('id', id);
+  const hashedNewPin = await hashPin(newPin);
+  const { error } = await sb.from('model_profiles').update({ pin: hashedNewPin }).eq('id', id);
   if (error) { toast(error.message, true); return; }
   const m = allModels.find(x=>String(x.id)===String(id));
-  if (m) m.pin = newPin;
-  if (openModelData && String(openModelData.id)===String(id)) openModelData.pin = newPin;
+  if (m) m.pin = hashedNewPin;
+  if (openModelData && String(openModelData.id)===String(id)) openModelData.pin = hashedNewPin;
   alert(`New PIN for ${name||'this model'}: ${newPin}\n\nGive this to them so they can log back in.`);
   toast(`PIN reset for ${(name||'model').split(' ')[0]}`);
 }
@@ -3272,7 +3329,7 @@ async function signUpExistingCreative(username, pin, crType, profileFile, musicF
   if (musicFile) musicFileUrl = await uploadMusicFile(musicFile, folder);
   const mediaUrls = await uploadCreativeMedia(chosenFiles('cr-media'), folder);
 
-  const updates = { username, pin, registered: true, creative_type: crType, profile_photo: profileUrl };
+  const updates = { username, pin: await hashPin(pin), registered: true, creative_type: crType, profile_photo: profileUrl };
   if (musicFileUrl) updates.music_file_url = musicFileUrl;
   if (musicLink) updates.music_link = musicLink;
   if (musicLink2) updates.music_link_2 = musicLink2;
@@ -3328,7 +3385,7 @@ async function signUpNewCreative(username, pin, crType, profileFile, musicFile, 
     music_link_2: musicLink2 || null,
     music_link_3: musicLink3 || null,
     media_urls: mediaUrls,
-    username, pin, registered: true,
+    username, pin: await hashPin(pin), registered: true,
     tags: [], notes: ''
   };
 
