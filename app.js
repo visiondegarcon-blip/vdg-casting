@@ -635,7 +635,7 @@ async function signIn() {
   clearRateLimit();
   await migratePinIfNeeded('users', user.id, user.pin, pin);
   currentUser = { id:user.id, name:user.name, role:user.role, username };
-  if (user.role==='ADMIN') showAdminDashboard();
+  if (user.role==='ADMIN' || user.role==='CREATIVE_ADMIN') showAdminDashboard();
   else showStaffDashboard(user);
 }
 
@@ -684,11 +684,26 @@ async function showAdminDashboard() {
   // Show "My Models" tab only for Daniel
   const myModelsTab = document.getElementById('tab-my-models');
   if (myModelsTab) myModelsTab.classList.toggle('hidden', currentUser?.name !== 'Daniel');
+
+  // CREATIVE_ADMIN: read-only view of Creatives only — no Models/Inventory/Team/To Do
+  const isCreativeAdmin = currentUser?.role === 'CREATIVE_ADMIN';
+  document.querySelectorAll('#admin-dashboard .sidebar-nav .nav-item').forEach(btn => {
+    const isCreativesBtn = (btn.getAttribute('onclick') || '').includes("adminNav('creatives'");
+    btn.classList.toggle('hidden', isCreativeAdmin && !isCreativesBtn);
+  });
+  const roleLabel = document.querySelector('#admin-dashboard .sidebar-user-role');
+  if (roleLabel) roleLabel.textContent = isCreativeAdmin ? 'Creative Admin' : 'Admin';
+
   await loadAllModels();
   await loadInventory();
   await loadStaffUsers();
   await loadCustomTasks();
-  renderAdminModels();
+  if (isCreativeAdmin) {
+    const creativesBtn = document.querySelector('#admin-dashboard .sidebar-nav .nav-item[onclick*="adminNav(\'creatives\'"]');
+    if (creativesBtn) adminNav('creatives', creativesBtn);
+  } else {
+    renderAdminModels();
+  }
 }
 
 function toggleAdminSidebar() {
@@ -3465,6 +3480,7 @@ async function openCreativePanel(id) {
   });
 
   const detail = (label, val) => val ? `<div class="detail-item"><span class="detail-label">${label}</span><span class="detail-value">${val}</span></div>` : '';
+  const isCreativeAdmin = currentUser?.role === 'CREATIVE_ADMIN';
 
   const mediaUrls = toArr(c.media_urls);
   const mediaGrid = mediaUrls.length ? `<div style="margin-bottom:20px">
@@ -3510,22 +3526,24 @@ async function openCreativePanel(id) {
     <div style="margin-bottom:20px">
       <div class="panel-section-title">Tags</div>
       <div class="tag-list" id="cr-tag-list">
-        ${toArr(c.tags).map(t => `<span class="tag">${t} <button onclick="removeCreativeTag('${c.id}','${t.replace(/'/g,"\\'")}')">×</button></span>`).join('')}
+        ${toArr(c.tags).map(t => isCreativeAdmin
+          ? `<span class="tag">${t}</span>`
+          : `<span class="tag">${t} <button onclick="removeCreativeTag('${c.id}','${t.replace(/'/g,"\\'")}')">×</button></span>`).join('')}
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px">
+      ${isCreativeAdmin ? '' : `<div style="display:flex;gap:8px;margin-top:8px">
         <input id="cr-new-tag-input" placeholder="Add tag…" style="flex:1;padding:8px 10px;font-size:12px"/>
         <button class="btn btn-sm btn-brown" style="width:auto;margin:0" onclick="addCreativeTag('${c.id}')">+</button>
-      </div>
+      </div>`}
     </div>
 
     <div style="margin-bottom:20px">
       <div class="panel-section-title">Internal Notes</div>
-      <textarea id="cr-notes-textarea" rows="3" style="width:100%;font-size:13px" onblur="saveCreativeNotes('${c.id}')">${c.notes||''}</textarea>
+      <textarea id="cr-notes-textarea" rows="3" style="width:100%;font-size:13px" ${isCreativeAdmin ? 'readonly' : `onblur="saveCreativeNotes('${c.id}')"`}>${c.notes||''}</textarea>
     </div>
 
-    <div style="padding-top:16px;border-top:1.5px solid var(--beige)">
+    ${isCreativeAdmin ? '' : `<div style="padding-top:16px;border-top:1.5px solid var(--beige)">
       <button class="btn btn-sm" style="background:none;border:1.5px solid var(--red);color:var(--red);width:100%" onclick="deleteCreative('${c.id}','${(c.full_name||'').replace(/'/g,"\\'")}')">🗑 Delete Creative</button>
-    </div>
+    </div>`}
   `;
 
   document.getElementById('creative-panel-overlay').classList.remove('hidden');
