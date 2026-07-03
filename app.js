@@ -336,22 +336,22 @@ async function uploadFiles(fileList, folder, subfolder, max) {
   let failed = 0;
   let lastError = '';
   for (const file of files) {
-    // iPhone HEIC handling can hand us a 0-byte File while transcoding finishes —
-    // uploading would create a broken "?" image. Skip and warn instead.
     if (!file || !file.size) { skippedEmpty++; continue; }
-    // Supabase free tier rejects files over 50MB outright; warn earlier so the user
-    // can swap a smaller photo instead of seeing a vague "failed to fetch".
     if (file.size > 50 * 1024 * 1024) {
       failed++;
       lastError = `${file.name||'A photo'} is too large (${(file.size/1024/1024).toFixed(1)} MB). Max 50MB per photo.`;
       continue;
     }
     const ext = (file.name||'').split('.').pop().toLowerCase();
-    // Generate safe path without original filename to prevent path traversal
     const path = `${folder}/${subfolder}/${Date.now()}_${Math.random().toString(36).slice(2,7)}${ext && ext.length <= 5 ? '.' + ext : ''}`;
     const contentType = file.type && file.type.startsWith('image/') ? file.type : 'image/jpeg';
     try {
-      const { error } = await sb.storage.from('model-photos').upload(path, file, { upsert: true, contentType });
+      // Read into ArrayBuffer first — on iPhone, HEIC files report a non-zero size
+      // before iOS finishes transcoding, so file.size passes but actual data is empty.
+      // Reading to buffer forces the OS to finish transcoding before we upload.
+      const buffer = await file.arrayBuffer();
+      if (!buffer.byteLength) { skippedEmpty++; continue; }
+      const { error } = await sb.storage.from('model-photos').upload(path, buffer, { upsert: true, contentType });
       if (!error) {
         const { data } = sb.storage.from('model-photos').getPublicUrl(path);
         urls.push(data.publicUrl);
